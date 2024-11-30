@@ -1,0 +1,17 @@
+{
+    "compileOnSave": true,
+    "compilerOptions": {
+      "module": "commonjs",
+      "target": "es5",
+      "sourceMap": false,
+      "newLine": "crlf",
+      "resolveJsonModule": true,
+      "typeRoots": [
+        "../node_modules/@types"
+      ]
+    },
+    "exclude": [
+      "node_modules",
+      "logs"
+    ]
+  }
