@@ -49,20 +49,36 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+/** HTML element set of Tracks. */
 var TRACKS = document.querySelectorAll(".Track");
+/** HTML element set of Hitboxes. */
 var HITBOX = document.querySelectorAll(".HitBox");
+var JUDGEMENT = document.querySelector(".Judgement");
+/** HTML element of Score. */
 var SCORE = document.querySelector(".Score");
-var HEIGHT = TRACKS[0].clientHeight;
+// Counter elements.
+var PERFECT_COUNT = document.querySelector(".PerfectCount");
+var GOOD_COUNT = document.querySelector(".GoodCount");
+var BAD_COUNT = document.querySelector(".BadCount");
+var MISS_COUNT = document.querySelector(".MissCount");
+// Color literals.
+var PERFECT_COLOR = "rgba(245, 241, 0, 0.6)";
+var GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
+var BAD_COLOR = "rgba(255, 47, 0, 0.6)";
+var MISS_COLOR = "rgba(255, 255, 255, 0.6)";
+// Setting parameters.
 var setting;
 var key_bind;
-var global_time = -500;
 var render_duration = 500;
 var duration = 40;
+var global_time = 0;
+// Statistic variables.
 var score = 0;
 var perfect_count = 0;
 var good_count = 0;
 var bad_count = 0;
 var miss_count = 0;
+/** Read `setting.json` to update settings. */
 function readSetting() {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
@@ -78,6 +94,39 @@ function readSetting() {
             }
         });
     });
+}
+/** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
+function showJudgement(judgement) {
+    switch (judgement) {
+        case Judgement.Waiting:
+            JUDGEMENT.innerText = "";
+            return;
+        case Judgement.Perfect:
+            JUDGEMENT.innerText = "Perfect";
+            JUDGEMENT.style.color = PERFECT_COLOR;
+            PERFECT_COUNT.innerText = "".concat(perfect_count);
+            break;
+        case Judgement.Good:
+            JUDGEMENT.innerText = "Good";
+            JUDGEMENT.style.color = GOOD_COLOR;
+            GOOD_COUNT.innerText = "".concat(good_count);
+            break;
+        case Judgement.Bad:
+            JUDGEMENT.innerText = "Bad";
+            JUDGEMENT.style.color = BAD_COLOR;
+            BAD_COUNT.innerText = "".concat(bad_count);
+            break;
+        case Judgement.Miss:
+            JUDGEMENT.innerText = "Miss";
+            JUDGEMENT.style.color = MISS_COLOR;
+            MISS_COUNT.innerText = "".concat(miss_count);
+            break;
+    }
+    void JUDGEMENT.offsetWidth;
+    JUDGEMENT.classList.add("zoomed");
+    setTimeout(function () {
+        JUDGEMENT.classList.remove("zoomed");
+    }, 125);
 }
 var Game = /** @class */ (function () {
     function Game(obj, speed) {
@@ -99,12 +148,7 @@ var Game = /** @class */ (function () {
             requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
         }
         else {
-            console.log("Game ended!");
-            console.log("Score: " + score);
-            console.log("Perfect: " + perfect_count);
-            console.log("Good: " + good_count);
-            console.log("Bad: " + bad_count);
-            console.log("Miss: " + miss_count);
+            JUDGEMENT.innerText = "";
         }
     };
     Game.prototype.drawSingleTrack = function (index) {
@@ -118,6 +162,7 @@ var Game = /** @class */ (function () {
                 }
                 else {
                     track.pop();
+                    i -= 1;
                 }
             }
         }
@@ -176,6 +221,7 @@ var Track = /** @class */ (function () {
             return 0;
         }
         var res = this.notes[0].judge(global_time);
+        showJudgement(res[0]);
         switch (res[0]) {
             case Judgement.Waiting:
                 return 0;
@@ -202,6 +248,7 @@ var Track = /** @class */ (function () {
         var node = document.getElementById("Note" + note.id);
         if (node) {
             TRACKS[note.track].removeChild(node);
+            node.remove();
         }
         this.length -= 1;
     };
@@ -251,10 +298,12 @@ var Tap = /** @class */ (function (_super) {
         if (gap >= (duration * 3)) {
             return [Judgement.Miss, 0];
         }
-        else if (gap <= -(duration * 3)) {
+        else if (gap <= -(duration * 2)) {
             return [Judgement.Waiting, 0];
         }
-        gap = Math.abs(gap);
+        if (gap < 0) {
+            gap = -gap * 1.5;
+        }
         if (gap <= duration) {
             return [Judgement.Perfect, 1500];
         }
@@ -269,8 +318,8 @@ var Tap = /** @class */ (function (_super) {
         var rd = render_duration / speed;
         var gap = this.time - global_time;
         var elem = document.getElementById("Note" + this.id);
-        if (gap > render_duration || gap < 0) {
-            if (this.isMiss() && elem) {
+        if (gap > render_duration || this.isMiss()) {
+            if (elem) {
                 TRACKS[this.track].removeChild(elem);
                 elem.remove();
             }
@@ -284,7 +333,7 @@ var Tap = /** @class */ (function (_super) {
                 TRACKS[this.track].appendChild(elem);
                 elem.style.top = "0%";
             }
-            elem.style.transform = "translateY(".concat((1 - gap / rd) * HEIGHT, "px)");
+            elem.style.top = "".concat(Math.min((0.96 - gap / rd) * 100, 96), "%");
             return false;
         }
     };
@@ -323,6 +372,7 @@ function Main() {
                             HITBOX[ki].style.setProperty("background", "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))");
                             TRACKS[ki].style.setProperty("background", "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))");
                             score += game.chart.tracks[ki].pop();
+                            SCORE.innerText = "SCORE: ".concat(score);
                         }
                     });
                     document.addEventListener("keyup", function (event) {

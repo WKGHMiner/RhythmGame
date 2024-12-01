@@ -1,14 +1,33 @@
+/** HTML element set of Tracks. */
 const TRACKS = document.querySelectorAll(".Track") as NodeListOf<HTMLDivElement>;
+/** HTML element set of Hitboxes. */
 const HITBOX = document.querySelectorAll(".HitBox") as NodeListOf<HTMLDivElement>;
-const SCORE = document.querySelector(".Score") as HTMLDivElement;
-const HEIGHT = TRACKS[0].clientHeight;
 
+const JUDGEMENT = document.querySelector(".Judgement") as HTMLDivElement;
+/** HTML element of Score. */
+const SCORE = document.querySelector(".Score") as HTMLDivElement;
+
+// Counter elements.
+const PERFECT_COUNT = document.querySelector(".PerfectCount") as HTMLDivElement;
+const GOOD_COUNT = document.querySelector(".GoodCount") as HTMLDivElement;
+const BAD_COUNT = document.querySelector(".BadCount") as HTMLDivElement;
+const MISS_COUNT = document.querySelector(".MissCount") as HTMLDivElement;
+
+// Color literals.
+const PERFECT_COLOR = "rgba(245, 241, 0, 0.6)";
+const GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
+const BAD_COLOR = "rgba(255, 47, 0, 0.6)";
+const MISS_COLOR = "rgba(255, 255, 255, 0.6)";
+
+// Setting parameters.
 var setting: Object;
 var key_bind: string[];
-var global_time: number = -500;
 var render_duration: number = 500;
 var duration: number = 40;
 
+var global_time: number = 0;
+
+// Statistic variables.
 var score: number = 0;
 var perfect_count: number = 0;
 var good_count: number = 0;
@@ -16,11 +35,52 @@ var bad_count: number = 0;
 var miss_count: number = 0;
 
 
+/** Read `setting.json` to update settings. */
 async function readSetting() {
     setting = await (await fetch("./setting.json")).json();
     key_bind = setting["key-bind"];
     render_duration = setting["render-duration"];
     duration = setting["duration"];
+}
+
+
+/** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
+function showJudgement(judgement: Judgement) {
+    switch (judgement) {
+        case Judgement.Waiting:
+            JUDGEMENT.innerText = "";
+            return;
+
+        case Judgement.Perfect:
+            JUDGEMENT.innerText = "Perfect";
+            JUDGEMENT.style.color = PERFECT_COLOR;
+            PERFECT_COUNT.innerText = `${perfect_count}`;
+            break;
+            
+        case Judgement.Good:
+            JUDGEMENT.innerText = "Good";
+            JUDGEMENT.style.color = GOOD_COLOR;
+            GOOD_COUNT.innerText = `${good_count}`;
+            break;
+
+        case Judgement.Bad:
+            JUDGEMENT.innerText = "Bad";
+            JUDGEMENT.style.color = BAD_COLOR;
+            BAD_COUNT.innerText = `${bad_count}`;
+            break;
+
+        case Judgement.Miss:
+            JUDGEMENT.innerText = "Miss";
+            JUDGEMENT.style.color = MISS_COLOR;
+            MISS_COUNT.innerText = `${miss_count}`;
+            break;
+    }
+
+    void JUDGEMENT.offsetWidth;
+    JUDGEMENT.classList.add("zoomed");
+    setTimeout(() => {
+        JUDGEMENT.classList.remove("zoomed");
+    }, 125);
 }
 
 
@@ -52,12 +112,7 @@ class Game {
         if (global_time <= this.chart.length) {
             requestAnimationFrame(tick => this.drawAll(tick));
         } else {
-            console.log("Game ended!");
-            console.log("Score: " + score);
-            console.log("Perfect: " + perfect_count);
-            console.log("Good: " + good_count);
-            console.log("Bad: " + bad_count);
-            console.log("Miss: " + miss_count);
+            JUDGEMENT.innerText = "";
         }
     }
 
@@ -73,6 +128,7 @@ class Game {
                     break;
                 } else {
                     track.pop();
+                    i -= 1;
                 }
             }
         }
@@ -129,6 +185,7 @@ class Chart {
 
 
 class Track {
+    /** This array is actually a queue. */
     notes: Note[];
     length: number;
 
@@ -154,6 +211,7 @@ class Track {
         }
         
         var res = this.notes[0].judge(global_time);
+        showJudgement(res[0]);
         switch (res[0]) {
             case Judgement.Waiting:
                 return 0;
@@ -187,6 +245,7 @@ class Track {
 
         if (node) {
             TRACKS[note.track].removeChild(node);
+            node.remove();
         }
 
         this.length -= 1;
@@ -273,11 +332,13 @@ class Tap extends Note {
 
         if (gap >= (duration * 3)) {
             return [Judgement.Miss, 0];
-        } else if (gap <= -(duration * 3)) {
+        } else if (gap <= -(duration * 2)) {
             return [Judgement.Waiting, 0];
         }
 
-        gap = Math.abs(gap);
+        if (gap < 0) {
+            gap = -gap * 1.5;
+        }
 
         if (gap <= duration) {
             return [Judgement.Perfect, 1500];
@@ -294,12 +355,12 @@ class Tap extends Note {
         var gap: number = this.time - global_time;
 
         var elem = document.getElementById("Note" + this.id) as HTMLDivElement | null;
-        if (gap > render_duration || gap < 0) {
-            if (this.isMiss() && elem) {
+        if (gap > render_duration || this.isMiss()) {
+            if (elem) {
                 TRACKS[this.track].removeChild(elem);
                 elem.remove();
             }
-
+            
             return true;
         } else {
             if (!elem) {
@@ -309,7 +370,7 @@ class Tap extends Note {
                 TRACKS[this.track].appendChild(elem);
                 elem.style.top = "0%";
             }
-            elem.style.transform = `translateY(${(1 - gap / rd) * HEIGHT}px)`
+            elem.style.top = `${Math.min((0.96 - gap / rd) * 100, 96)}%`
             
             return false;
         }
@@ -344,6 +405,7 @@ async function Main() {
                 "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))"
             );
             score += game.chart.tracks[ki].pop();
+            SCORE.innerText = `SCORE: ${score}`;
         }
     });
 
