@@ -48,6 +48,9 @@ var current_hit: number = 0;
 // Status signal.
 var isReady: boolean = false;
 
+// Control signal.
+var ended: boolean = false;
+
 
 /** Read `setting.json` to update settings. */
 async function readSetting() {
@@ -55,6 +58,12 @@ async function readSetting() {
     key_bind = setting["key-bind"];
     render_duration = setting["render-duration"];
     duration = setting["duration"];
+}
+
+
+async function readChart(name: string): Promise<Object> {
+    var obj: Object = await (await fetch("./chart/" + name + ".json")).json();
+    return obj;
 }
 
 
@@ -144,7 +153,6 @@ class Game {
     analyzer: AnalyserNode;
     start_time: number;
 
-
     constructor(obj: Object, speed: number) {
         this.chart = new Chart(obj);
         this.speed = speed;
@@ -156,6 +164,8 @@ class Game {
         this.context = new AudioContext();
         this.source = this.context.createMediaElementSource(this.music);
         this.source.connect(this.context.destination);
+
+        this.music.addEventListener("ended", event => { ended = true })
     }
 
 
@@ -175,11 +185,11 @@ class Game {
             this.drawSingleTrack(index);
         }
     
-        if (global_time <= this.chart.length) {
-            requestAnimationFrame(tick => this.drawAll(tick));
-        } else {
+        if (ended) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = `MAX HIT: ${max_hit}`;
+        } else {
+            requestAnimationFrame(tick => this.drawAll(tick));
         }
     }
 
@@ -203,6 +213,10 @@ class Game {
 }
 
 
+/** Chart class:
+ * 
+ *  Holding chart infomations.
+ */
 class Chart {
     name: string;
     music_path: string;
@@ -210,8 +224,6 @@ class Chart {
     illustration: string;
     tracks: Track[];
     track: number;
-    length: number;
-    private _level: number;
 
     constructor(object: Object) {
         this.name = object["name"];
@@ -220,11 +232,12 @@ class Chart {
         this.illustration = object["illustration"];
         this.track = object["track"];
         this.tracks = [];
-        this.length = object["length"];
 
         for (var _ = 0; _ < this.track; _ ++) {
             this.tracks.push(new Track());
         }
+
+        document.title = `${this.composer} - ${this.name}`;
 
         this.loadChart(object);
     }
@@ -235,15 +248,6 @@ class Chart {
         audio.src = this.music_path;
 
         return audio;
-    }
-
-
-    set level(value: number) {
-        this._level = value;
-    }
-
-    get level(): number {
-        return this._level;
     }
 
 
@@ -259,6 +263,10 @@ class Chart {
 }
 
 
+/** Track class:
+ * 
+ *  Holds notes and yields score.
+ */
 class Track {
     /** This array is actually a queue. */
     notes: Note[];
@@ -328,6 +336,10 @@ class Track {
 }
 
 
+/** Judgement enum:
+ * 
+ *  Representing player's performance.
+ */
 enum Judgement { Waiting, Perfect, Good, Bad, Miss }
 
 
@@ -347,6 +359,10 @@ interface Base {
 }
 
 
+/** Note class:
+ * 
+ *  Note base class, any other type of note can extend this class.
+ */
 class Note implements Base {
     time: number;
     track: number;
@@ -447,12 +463,7 @@ class Tap extends Note {
 }
 
 
-async function readChart(name: string): Promise<Object> {
-    var obj: Object = await (await fetch("./chart/" + name + ".json")).json();
-    return obj;
-}
-
-
+/** Main function */
 async function Main() {
     await readSetting();
     var obj = await readChart("Override");

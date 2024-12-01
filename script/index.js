@@ -90,6 +90,8 @@ var max_hit = 0;
 var current_hit = 0;
 // Status signal.
 var isReady = false;
+// Control signal.
+var ended = false;
 /** Read `setting.json` to update settings. */
 function readSetting() {
     return __awaiter(this, void 0, void 0, function () {
@@ -103,6 +105,20 @@ function readSetting() {
                     render_duration = setting["render-duration"];
                     duration = setting["duration"];
                     return [2 /*return*/];
+            }
+        });
+    });
+}
+function readChart(name) {
+    return __awaiter(this, void 0, void 0, function () {
+        var obj;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0: return [4 /*yield*/, fetch("./chart/" + name + ".json")];
+                case 1: return [4 /*yield*/, (_a.sent()).json()];
+                case 2:
+                    obj = _a.sent();
+                    return [2 /*return*/, obj];
             }
         });
     });
@@ -186,6 +202,7 @@ var Game = /** @class */ (function () {
         this.context = new AudioContext();
         this.source = this.context.createMediaElementSource(this.music);
         this.source.connect(this.context.destination);
+        this.music.addEventListener("ended", function (event) { ended = true; });
     };
     Game.prototype.start = function () {
         var _this = this;
@@ -201,12 +218,12 @@ var Game = /** @class */ (function () {
         for (var index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
-        if (global_time <= this.chart.length) {
-            requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
-        }
-        else {
+        if (ended) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = "MAX HIT: ".concat(max_hit);
+        }
+        else {
+            requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
         }
     };
     Game.prototype.drawSingleTrack = function (index) {
@@ -227,6 +244,10 @@ var Game = /** @class */ (function () {
     };
     return Game;
 }());
+/** Chart class:
+ *
+ *  Holding chart infomations.
+ */
 var Chart = /** @class */ (function () {
     function Chart(object) {
         this.name = object["name"];
@@ -235,10 +256,10 @@ var Chart = /** @class */ (function () {
         this.illustration = object["illustration"];
         this.track = object["track"];
         this.tracks = [];
-        this.length = object["length"];
         for (var _ = 0; _ < this.track; _++) {
             this.tracks.push(new Track());
         }
+        document.title = "".concat(this.composer, " - ").concat(this.name);
         this.loadChart(object);
     }
     Chart.prototype.loadMusic = function () {
@@ -246,16 +267,6 @@ var Chart = /** @class */ (function () {
         audio.src = this.music_path;
         return audio;
     };
-    Object.defineProperty(Chart.prototype, "level", {
-        get: function () {
-            return this._level;
-        },
-        set: function (value) {
-            this._level = value;
-        },
-        enumerable: false,
-        configurable: true
-    });
     Chart.prototype.loadChart = function (object) {
         var notes = object["notes"];
         notes.sort(function (a, b) { return a["time"] - b["time"]; });
@@ -266,6 +277,10 @@ var Chart = /** @class */ (function () {
     };
     return Chart;
 }());
+/** Track class:
+ *
+ *  Holds notes and yields score.
+ */
 var Track = /** @class */ (function () {
     function Track() {
         this.notes = [];
@@ -316,6 +331,10 @@ var Track = /** @class */ (function () {
     };
     return Track;
 }());
+/** Judgement enum:
+ *
+ *  Representing player's performance.
+ */
 var Judgement;
 (function (Judgement) {
     Judgement[Judgement["Waiting"] = 0] = "Waiting";
@@ -324,6 +343,10 @@ var Judgement;
     Judgement[Judgement["Bad"] = 3] = "Bad";
     Judgement[Judgement["Miss"] = 4] = "Miss";
 })(Judgement || (Judgement = {}));
+/** Note class:
+ *
+ *  Note base class, any other type of note can extend this class.
+ */
 var Note = /** @class */ (function () {
     function Note(object, id) {
         this.time = object["time"];
@@ -401,20 +424,7 @@ var Tap = /** @class */ (function (_super) {
     };
     return Tap;
 }(Note));
-function readChart(name) {
-    return __awaiter(this, void 0, void 0, function () {
-        var obj;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0: return [4 /*yield*/, fetch("./chart/" + name + ".json")];
-                case 1: return [4 /*yield*/, (_a.sent()).json()];
-                case 2:
-                    obj = _a.sent();
-                    return [2 /*return*/, obj];
-            }
-        });
-    });
-}
+/** Main function */
 function Main() {
     return __awaiter(this, void 0, void 0, function () {
         var obj, game;
