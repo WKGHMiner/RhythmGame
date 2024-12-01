@@ -53,6 +53,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 var TRACKS = document.querySelectorAll(".Track");
 /** HTML element set of Hitboxes. */
 var HITBOX = document.querySelectorAll(".HitBox");
+/** HTML element of Judgement display. */
 var JUDGEMENT = document.querySelector(".Judgement");
 /** HTML element of Score. */
 var SCORE = document.querySelector(".Score");
@@ -61,16 +62,23 @@ var PERFECT_COUNT = document.querySelector(".PerfectCount");
 var GOOD_COUNT = document.querySelector(".GoodCount");
 var BAD_COUNT = document.querySelector(".BadCount");
 var MISS_COUNT = document.querySelector(".MissCount");
+var HIT_COUNT = document.querySelector(".HitCount");
 // Color literals.
 var PERFECT_COLOR = "rgba(245, 241, 0, 0.6)";
 var GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
 var BAD_COLOR = "rgba(255, 47, 0, 0.6)";
 var MISS_COLOR = "rgba(255, 255, 255, 0.6)";
+// Key event style literals.
+var TRACKPRESS = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
+var TRACKUP = "none";
+var HITPRESS = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
+var HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
 // Setting parameters.
 var setting;
 var key_bind;
 var render_duration = 500;
 var duration = 40;
+// Global time counter.
 var global_time = 0;
 // Statistic variables.
 var score = 0;
@@ -78,6 +86,10 @@ var perfect_count = 0;
 var good_count = 0;
 var bad_count = 0;
 var miss_count = 0;
+var max_hit = 0;
+var current_hit = 0;
+// Status signal.
+var isReady = false;
 /** Read `setting.json` to update settings. */
 function readSetting() {
     return __awaiter(this, void 0, void 0, function () {
@@ -92,6 +104,23 @@ function readSetting() {
                     duration = setting["duration"];
                     return [2 /*return*/];
             }
+        });
+    });
+}
+function getReady(game) {
+    return __awaiter(this, void 0, void 0, function () {
+        return __generator(this, function (_a) {
+            document.addEventListener("keypress", function (event) {
+                if (!isReady) {
+                    var prompt = document.querySelector(".Prompt");
+                    var mc = document.querySelector(".MainContainer");
+                    mc.removeChild(prompt);
+                    isReady = true;
+                    game.loadContext();
+                    game.start();
+                }
+            });
+            return [2 /*return*/];
         });
     });
 }
@@ -124,23 +153,51 @@ function showJudgement(judgement) {
     }
     void JUDGEMENT.offsetWidth;
     JUDGEMENT.classList.add("zoomed");
-    setTimeout(function () {
-        JUDGEMENT.classList.remove("zoomed");
-    }, 125);
+    setTimeout(function () { JUDGEMENT.classList.remove("zoomed"); }, 125);
+}
+function updateHit(judgement) {
+    switch (judgement) {
+        case Judgement.Waiting:
+            return;
+        case Judgement.Miss:
+            current_hit = 0;
+            break;
+        default:
+            current_hit += 1;
+            if (current_hit > max_hit) {
+                max_hit = current_hit;
+            }
+            break;
+    }
+    if (current_hit >= 3) {
+        HIT_COUNT.innerText = "".concat(current_hit);
+    }
+    else {
+        HIT_COUNT.innerText = "";
+    }
 }
 var Game = /** @class */ (function () {
     function Game(obj, speed) {
         this.chart = new Chart(obj);
         this.speed = speed;
     }
+    Game.prototype.loadContext = function () {
+        this.music = this.chart.loadMusic();
+        this.context = new AudioContext();
+        this.source = this.context.createMediaElementSource(this.music);
+        this.source.connect(this.context.destination);
+    };
     Game.prototype.start = function () {
         var _this = this;
-        this.start_time = performance.now();
-        requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
+        this.start_time = this.context.currentTime;
+        this.music.play().then(function () {
+            requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
+        });
     };
     Game.prototype.drawAll = function (tick) {
         var _this = this;
-        global_time = tick - this.start_time;
+        global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
+        console.log(global_time);
         for (var index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
@@ -149,6 +206,7 @@ var Game = /** @class */ (function () {
         }
         else {
             JUDGEMENT.innerText = "";
+            HIT_COUNT.innerText = "MAX HIT: ".concat(max_hit);
         }
     };
     Game.prototype.drawSingleTrack = function (index) {
@@ -172,7 +230,7 @@ var Game = /** @class */ (function () {
 var Chart = /** @class */ (function () {
     function Chart(object) {
         this.name = object["name"];
-        this.music = object["music"];
+        this.music_path = object["music"];
         this.composer = object["composer"];
         this.illustration = object["illustration"];
         this.track = object["track"];
@@ -183,6 +241,11 @@ var Chart = /** @class */ (function () {
         }
         this.loadChart(object);
     }
+    Chart.prototype.loadMusic = function () {
+        var audio = document.createElement("audio");
+        audio.src = this.music_path;
+        return audio;
+    };
     Object.defineProperty(Chart.prototype, "level", {
         get: function () {
             return this._level;
@@ -221,27 +284,26 @@ var Track = /** @class */ (function () {
             return 0;
         }
         var res = this.notes[0].judge(global_time);
-        showJudgement(res[0]);
         switch (res[0]) {
             case Judgement.Waiting:
                 return 0;
             case Judgement.Miss:
-                this.deleteHead();
                 miss_count += 1;
-                return 0;
+                break;
             case Judgement.Perfect:
-                this.deleteHead();
                 perfect_count += 1;
-                return res[1];
+                break;
             case Judgement.Good:
-                this.deleteHead();
                 good_count += 1;
-                return res[1];
+                break;
             case Judgement.Bad:
-                this.deleteHead();
                 bad_count += 1;
-                return res[1];
+                break;
         }
+        showJudgement(res[0]);
+        updateHit(res[0]);
+        this.deleteHead();
+        return res[1];
     };
     Track.prototype.deleteHead = function () {
         var note = this.notes.shift();
@@ -333,7 +395,7 @@ var Tap = /** @class */ (function (_super) {
                 TRACKS[this.track].appendChild(elem);
                 elem.style.top = "0%";
             }
-            elem.style.top = "".concat(Math.min((0.96 - gap / rd) * 100, 96), "%");
+            elem.style.top = "".concat(Math.min((1 - gap / rd) * 100, 100), "%");
             return false;
         }
     };
@@ -369,8 +431,8 @@ function Main() {
                         var key = event.key.toUpperCase();
                         var ki = key_bind.indexOf(key);
                         if (ki != -1) {
-                            HITBOX[ki].style.setProperty("background", "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))");
-                            TRACKS[ki].style.setProperty("background", "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))");
+                            HITBOX[ki].style.background = HITPRESS;
+                            TRACKS[ki].style.background = TRACKPRESS;
                             score += game.chart.tracks[ki].pop();
                             SCORE.innerText = "SCORE: ".concat(score);
                         }
@@ -379,11 +441,11 @@ function Main() {
                         var key = event.key.toUpperCase();
                         var ki = key_bind.indexOf(key);
                         if (ki != -1) {
-                            HITBOX[ki].style.setProperty("background", "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))");
-                            TRACKS[ki].style.setProperty("background", "none");
+                            HITBOX[ki].style.background = HITUP;
+                            TRACKS[ki].style.background = TRACKUP;
                         }
                     });
-                    game.start();
+                    getReady(game);
                     return [2 /*return*/];
             }
         });

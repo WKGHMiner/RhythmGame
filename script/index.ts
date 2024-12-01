@@ -3,6 +3,7 @@ const TRACKS = document.querySelectorAll(".Track") as NodeListOf<HTMLDivElement>
 /** HTML element set of Hitboxes. */
 const HITBOX = document.querySelectorAll(".HitBox") as NodeListOf<HTMLDivElement>;
 
+/** HTML element of Judgement display. */
 const JUDGEMENT = document.querySelector(".Judgement") as HTMLDivElement;
 /** HTML element of Score. */
 const SCORE = document.querySelector(".Score") as HTMLDivElement;
@@ -12,6 +13,7 @@ const PERFECT_COUNT = document.querySelector(".PerfectCount") as HTMLDivElement;
 const GOOD_COUNT = document.querySelector(".GoodCount") as HTMLDivElement;
 const BAD_COUNT = document.querySelector(".BadCount") as HTMLDivElement;
 const MISS_COUNT = document.querySelector(".MissCount") as HTMLDivElement;
+const HIT_COUNT = document.querySelector(".HitCount") as HTMLDivElement;
 
 // Color literals.
 const PERFECT_COLOR = "rgba(245, 241, 0, 0.6)";
@@ -19,12 +21,19 @@ const GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
 const BAD_COLOR = "rgba(255, 47, 0, 0.6)";
 const MISS_COLOR = "rgba(255, 255, 255, 0.6)";
 
+// Key event style literals.
+const TRACKPRESS = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
+const TRACKUP = "none";
+const HITPRESS = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
+const HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
+
 // Setting parameters.
 var setting: Object;
 var key_bind: string[];
 var render_duration: number = 500;
 var duration: number = 40;
 
+// Global time counter.
 var global_time: number = 0;
 
 // Statistic variables.
@@ -33,6 +42,11 @@ var perfect_count: number = 0;
 var good_count: number = 0;
 var bad_count: number = 0;
 var miss_count: number = 0;
+var max_hit: number = 0;
+var current_hit: number = 0;
+
+// Status signal.
+var isReady: boolean = false;
 
 
 /** Read `setting.json` to update settings. */
@@ -41,6 +55,20 @@ async function readSetting() {
     key_bind = setting["key-bind"];
     render_duration = setting["render-duration"];
     duration = setting["duration"];
+}
+
+
+async function getReady(game: Game) {
+    document.addEventListener("keypress", event => {
+        if (!isReady) {
+            var prompt = document.querySelector(".Prompt") as HTMLDivElement;
+            var mc = document.querySelector(".MainContainer") as HTMLDivElement;
+            mc.removeChild(prompt);
+            isReady = true;
+            game.loadContext();
+            game.start();
+        }
+    })
 }
 
 
@@ -78,15 +106,42 @@ function showJudgement(judgement: Judgement) {
 
     void JUDGEMENT.offsetWidth;
     JUDGEMENT.classList.add("zoomed");
-    setTimeout(() => {
-        JUDGEMENT.classList.remove("zoomed");
-    }, 125);
+    setTimeout(() => { JUDGEMENT.classList.remove("zoomed") }, 125);
+}
+
+
+function updateHit(judgement: Judgement) {
+    switch (judgement) {
+        case Judgement.Waiting:
+            return;
+
+        case Judgement.Miss:
+            current_hit = 0;
+            break;
+
+        default:
+            current_hit += 1;
+            if (current_hit > max_hit) {
+                max_hit = current_hit;
+            }
+            break;
+    }
+
+    if (current_hit >= 3) {
+        HIT_COUNT.innerText = `${current_hit}`;
+    } else {
+        HIT_COUNT.innerText = "";
+    }
 }
 
 
 class Game {
     speed: number;
     chart: Chart;
+    music: HTMLAudioElement;
+    context: AudioContext;
+    source: MediaElementAudioSourceNode;
+    analyzer: AnalyserNode;
     start_time: number;
 
 
@@ -94,16 +149,27 @@ class Game {
         this.chart = new Chart(obj);
         this.speed = speed;
     }
+    
+    
+    loadContext() {
+        this.music = this.chart.loadMusic();
+        this.context = new AudioContext();
+        this.source = this.context.createMediaElementSource(this.music);
+        this.source.connect(this.context.destination);
+    }
 
 
     start() {
-        this.start_time = performance.now();
-        requestAnimationFrame(tick => this.drawAll(tick));
+        this.start_time = this.context.currentTime;
+        this.music.play().then(() => {
+            requestAnimationFrame(tick => this.drawAll(tick));
+        });
     }
 
     
     drawAll(tick: number) {
-        global_time = tick - this.start_time;
+        global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
+        console.log(global_time);
     
         for (let index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
@@ -113,6 +179,7 @@ class Game {
             requestAnimationFrame(tick => this.drawAll(tick));
         } else {
             JUDGEMENT.innerText = "";
+            HIT_COUNT.innerText = `MAX HIT: ${max_hit}`;
         }
     }
 
@@ -138,7 +205,7 @@ class Game {
 
 class Chart {
     name: string;
-    music: string;
+    music_path: string;
     composer: string;
     illustration: string;
     tracks: Track[];
@@ -148,7 +215,7 @@ class Chart {
 
     constructor(object: Object) {
         this.name = object["name"];
-        this.music = object["music"];
+        this.music_path = object["music"];
         this.composer = object["composer"];
         this.illustration = object["illustration"];
         this.track = object["track"];
@@ -160,6 +227,14 @@ class Chart {
         }
 
         this.loadChart(object);
+    }
+
+
+    loadMusic(): HTMLAudioElement {
+        var audio = document.createElement("audio");
+        audio.src = this.music_path;
+
+        return audio;
     }
 
 
@@ -211,31 +286,31 @@ class Track {
         }
         
         var res = this.notes[0].judge(global_time);
-        showJudgement(res[0]);
         switch (res[0]) {
             case Judgement.Waiting:
                 return 0;
 
             case Judgement.Miss:
-                this.deleteHead();
                 miss_count += 1;
-                return 0;
+                break;
             
             case Judgement.Perfect:
-                this.deleteHead();
                 perfect_count += 1;
-                return res[1];
+                break;
 
             case Judgement.Good:
-                this.deleteHead();
                 good_count += 1;
-                return res[1];
+                break;
 
             case Judgement.Bad:
-                this.deleteHead();
                 bad_count += 1;
-                return res[1];
+                break;
         }
+
+        showJudgement(res[0]);
+        updateHit(res[0]);
+        this.deleteHead();
+        return res[1];
     }
 
 
@@ -253,13 +328,7 @@ class Track {
 }
 
 
-enum Judgement {
-    Waiting,
-    Perfect,
-    Good,
-    Bad,
-    Miss,
-}
+enum Judgement { Waiting, Perfect, Good, Bad, Miss }
 
 
 interface Base {
@@ -370,7 +439,7 @@ class Tap extends Note {
                 TRACKS[this.track].appendChild(elem);
                 elem.style.top = "0%";
             }
-            elem.style.top = `${Math.min((0.96 - gap / rd) * 100, 96)}%`
+            elem.style.top = `${Math.min((1 - gap / rd) * 100, 100)}%`
             
             return false;
         }
@@ -387,7 +456,6 @@ async function readChart(name: string): Promise<Object> {
 async function Main() {
     await readSetting();
     var obj = await readChart("Override");
-
     var game = new Game(obj, 10);
     
 
@@ -396,14 +464,8 @@ async function Main() {
         var ki = key_bind.indexOf(key);
 
         if (ki != -1) {
-            HITBOX[ki].style.setProperty(
-                "background",
-                "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))"
-            );
-            TRACKS[ki].style.setProperty(
-                "background",
-                "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))"
-            );
+            HITBOX[ki].style.background = HITPRESS;
+            TRACKS[ki].style.background = TRACKPRESS;
             score += game.chart.tracks[ki].pop();
             SCORE.innerText = `SCORE: ${score}`;
         }
@@ -414,18 +476,12 @@ async function Main() {
         var ki = key_bind.indexOf(key);
 
         if (ki != -1) {
-            HITBOX[ki].style.setProperty(
-                "background",
-                "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))"
-            );
-            TRACKS[ki].style.setProperty(
-                "background",
-                "none"
-            );
+            HITBOX[ki].style.background = HITUP;
+            TRACKS[ki].style.background = TRACKUP;
         }
     });
 
-    game.start();
+    getReady(game);
 }
 
 

@@ -1,8 +1,8 @@
 {
     "name": "Forbidden Soul",
-    "music": "./test.mp3",
+    "music": "./chart/Nhato - Override.mp3",
     "composer": "Nhato",
-    "illustration": "./test.jpg",
+    "illustration": "./chart/test.jpg",
     "track": 4,
     "length": 126000,
     "level": 3,
