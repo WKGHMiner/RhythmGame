@@ -172,6 +172,7 @@ class Game {
     start() {
         this.start_time = this.context.currentTime;
         this.music.play().then(() => {
+            // This yields time tick., which is previously used as global time.
             requestAnimationFrame(tick => this.drawAll(tick));
         });
     }
@@ -179,7 +180,6 @@ class Game {
     
     drawAll(tick: number) {
         global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
-        console.log(global_time);
     
         for (let index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
@@ -463,10 +463,13 @@ class Tap extends Note {
 }
 
 
-/** Main function */
+/** Main function
+ * 
+ *  Integrates and choronously calls async functions, ensuring workflow.
+ */
 async function Main() {
     await readSetting();
-    var obj = await readChart("Override");
+    var obj = await readChart("Nhato_Override");
     var game = new Game(obj, 10);
     
 

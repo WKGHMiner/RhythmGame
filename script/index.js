@@ -208,13 +208,13 @@ var Game = /** @class */ (function () {
         var _this = this;
         this.start_time = this.context.currentTime;
         this.music.play().then(function () {
+            // This yields time tick., which is previously used as global time.
             requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
         });
     };
     Game.prototype.drawAll = function (tick) {
         var _this = this;
         global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
-        console.log(global_time);
         for (var index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
@@ -424,7 +424,10 @@ var Tap = /** @class */ (function (_super) {
     };
     return Tap;
 }(Note));
-/** Main function */
+/** Main function
+ *
+ *  Integrates and choronously calls async functions, ensuring workflow.
+ */
 function Main() {
     return __awaiter(this, void 0, void 0, function () {
         var obj, game;
@@ -433,7 +436,7 @@ function Main() {
                 case 0: return [4 /*yield*/, readSetting()];
                 case 1:
                     _a.sent();
-                    return [4 /*yield*/, readChart("Override")];
+                    return [4 /*yield*/, readChart("Nhato_Override")];
                 case 2:
                     obj = _a.sent();
                     game = new Game(obj, 10);
