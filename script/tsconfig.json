@@ -1,17 +1,17 @@
 {
-    "compileOnSave": true,
-    "compilerOptions": {
-      "module": "commonjs",
-      "target": "es5",
-      "sourceMap": false,
-      "newLine": "crlf",
-      "resolveJsonModule": true,
-      "typeRoots": [
-        "../node_modules/@types"
-      ]
-    },
-    "exclude": [
-      "node_modules",
-      "logs"
+  "compileOnSave": true,
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ES2020",
+    "lib": [ "ES2015", "DOM", "DOM.Iterable", "ES2020" ],
+    "sourceMap": false,
+    "newLine": "crlf",
+    "typeRoots": [
+      "../node_modules/@types"
     ]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "logs"
+  ]
+}

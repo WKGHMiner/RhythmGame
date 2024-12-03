@@ -32,6 +32,7 @@ var setting: Object;
 var key_bind: string[];
 var render_duration: number = 500;
 var duration: number = 40;
+var auto: boolean = false;
 
 // Global time counter.
 var global_time: number = 0;
@@ -58,6 +59,7 @@ async function readSetting() {
     key_bind = setting["key-bind"];
     render_duration = setting["render-duration"];
     duration = setting["duration"];
+    auto = setting["auto"];
 }
 
 
@@ -149,9 +151,8 @@ class Game {
     chart: Chart;
     music: HTMLAudioElement;
     context: AudioContext;
-    source: MediaElementAudioSourceNode;
-    analyzer: AnalyserNode;
     start_time: number;
+    effect: Effect;
 
     constructor(obj: Object, speed: number) {
         this.chart = new Chart(obj);
@@ -162,10 +163,21 @@ class Game {
     loadContext() {
         this.music = this.chart.loadMusic();
         this.context = new AudioContext();
-        this.source = this.context.createMediaElementSource(this.music);
-        this.source.connect(this.context.destination);
+
+        this.loadEffect();
 
         this.music.addEventListener("ended", event => { ended = true })
+    }
+
+
+    loadEffect() {
+        this.effect = new Effect(this.music, this.context);
+    }
+
+
+    loadBg() {
+        var bg = document.querySelector(".Background") as HTMLImageElement;
+        bg.src = this.chart.illustration;
     }
 
 
@@ -181,13 +193,16 @@ class Game {
     drawAll(tick: number) {
         global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
     
-        for (let index = 0; index < this.chart.track; index++) {
+        for (let index = 0; index < this.chart.track; index ++) {
             this.drawSingleTrack(index);
         }
+
+        requestAnimationFrame(this.effect.draw.bind(this.effect));
     
         if (ended) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = `MAX HIT: ${max_hit}`;
+            this.effect.clear();
         } else {
             requestAnimationFrame(tick => this.drawAll(tick));
         }
@@ -207,6 +222,20 @@ class Game {
                     track.pop();
                     i -= 1;
                 }
+            }
+
+            if (auto && note.isPerfect(global_time)) {
+                HITBOX[index].style.background = HITPRESS;
+                TRACKS[index].style.background = TRACKPRESS;
+
+                score += track.pop();
+                SCORE.innerText = `SCORE: ${score}`;
+                i -= 1;
+
+                setTimeout(function() {
+                    HITBOX[index].style.background = HITUP;
+                    TRACKS[index].style.background = TRACKUP;
+                }, 50);
             }
         }
     }
@@ -353,6 +382,8 @@ interface Base {
      */
     draw(speed: number): boolean;
 
+    isPerfect(global_time: number): boolean;
+
     isMiss(global_time: number): boolean;
 
     isWaiting(global_time: number): boolean;
@@ -385,6 +416,11 @@ class Note implements Base {
     }
 
 
+    isPerfect(global_time: number): boolean {
+        return false;
+    }
+
+
     isMiss(global_time: number): boolean {
         return true;
     }
@@ -399,6 +435,11 @@ class Note implements Base {
 class Tap extends Note {
     constructor(object: Object, id: number) {
         super(object, id);
+    }
+
+
+    isPerfect(global_time: number): boolean {
+        return this.judge(global_time)[0] == Judgement.Perfect;
     }
 
 
@@ -463,6 +504,100 @@ class Tap extends Note {
 }
 
 
+class Effect {
+    analyser: AnalyserNode;
+    source: MediaElementAudioSourceNode
+    array: Uint8Array;
+    canvas: HTMLCanvasElement;
+    cvsCtx: CanvasRenderingContext2D;
+    style: number;
+    styleBack: boolean;
+    salt: number;
+
+    constructor(audio: HTMLAudioElement, ctx: AudioContext) {
+        this.source = ctx.createMediaElementSource(audio);
+        this.analyser = ctx.createAnalyser();
+        this.analyser.fftSize = 128;
+        
+        this.source.connect(this.analyser);
+        this.analyser.connect(ctx.destination);
+
+        this.array = new Uint8Array(this.analyser.frequencyBinCount);
+        
+        this.canvas = document.querySelector(".Effect") as HTMLCanvasElement;
+        this.cvsCtx = this.canvas.getContext("2d");
+
+        this.style = 0.4;
+        this.styleBack = false;
+        this.salt = Math.random();
+    }
+
+
+    get frequencyBinCount(): number {
+        return this.analyser.frequencyBinCount;
+    }
+
+
+    clear() {
+        this.cvsCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+
+    changeStyle() {
+        if (this.styleBack) {
+            this.style -= 0.01
+        } else {
+            this.style += 0.01;
+        }
+    
+        if (this.style >= 0.6) {
+            this.style = 0.6;
+            this.styleBack = true;
+        } else if (this.style <= 0.4) {
+            this.style = 0.4;
+            this.styleBack = false;
+        }
+    }
+
+
+    getColor(base: number): Array<number> {
+        var color = [base * this.style, base / this.style, base];
+        
+        if (this.salt <= 0.33) {
+            
+        } else if (this.salt <= 0.67) {
+            color.push(color.shift());
+        } else {
+            color.unshift(color.pop());
+        }
+
+        return color;
+    }
+
+
+    draw() {
+        this.changeStyle();
+        var width = this.canvas.width / (this.frequencyBinCount * 2.5);
+        var height = this.canvas.height;
+        var x: number = 0;
+        
+        this.clear();
+        
+        var frequency: number;
+        this.analyser.getByteFrequencyData(this.array);
+        for (var index = 0; index < this.array.length; index ++) {
+            frequency = this.array[index];
+            var rgb = this.getColor(frequency);
+
+            this.cvsCtx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.8)`;
+            this.cvsCtx.fillRect(x, height, width, -(frequency / 2.5));
+
+            x += width * 2.5;
+        }
+    }
+}
+
+
 /** Main function
  * 
  *  Integrates and choronously calls async functions, ensuring workflow.
@@ -471,30 +606,33 @@ async function Main() {
     await readSetting();
     var obj = await readChart("Nhato_Override");
     var game = new Game(obj, 10);
+
+    game.loadBg();
+
+    if (!auto) {
+        document.addEventListener("keypress", (event) => {
+            var key = event.key.toUpperCase();
+            var ki = key_bind.indexOf(key);
     
-
-    document.addEventListener("keypress", (event) => {
-        var key = event.key.toUpperCase();
-        var ki = key_bind.indexOf(key);
-
-        if (ki != -1) {
-            HITBOX[ki].style.background = HITPRESS;
-            TRACKS[ki].style.background = TRACKPRESS;
-            score += game.chart.tracks[ki].pop();
-            SCORE.innerText = `SCORE: ${score}`;
-        }
-    });
-
-    document.addEventListener("keyup", (event) => {
-        var key = event.key.toUpperCase();
-        var ki = key_bind.indexOf(key);
-
-        if (ki != -1) {
-            HITBOX[ki].style.background = HITUP;
-            TRACKS[ki].style.background = TRACKUP;
-        }
-    });
-
+            if (ki != -1) {
+                HITBOX[ki].style.background = HITPRESS;
+                TRACKS[ki].style.background = TRACKPRESS;
+                score += game.chart.tracks[ki].pop();
+                SCORE.innerText = `SCORE: ${score}`;
+            }
+        });
+    
+        document.addEventListener("keyup", (event) => {
+            var key = event.key.toUpperCase();
+            var ki = key_bind.indexOf(key);
+    
+            if (ki != -1) {
+                HITBOX[ki].style.background = HITUP;
+                TRACKS[ki].style.background = TRACKUP;
+            }
+        });
+    }
+    
     getReady(game);
 }
 

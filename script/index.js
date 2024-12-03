@@ -78,6 +78,7 @@ var setting;
 var key_bind;
 var render_duration = 500;
 var duration = 40;
+var auto = false;
 // Global time counter.
 var global_time = 0;
 // Statistic variables.
@@ -104,6 +105,7 @@ function readSetting() {
                     key_bind = setting["key-bind"];
                     render_duration = setting["render-duration"];
                     duration = setting["duration"];
+                    auto = setting["auto"];
                     return [2 /*return*/];
             }
         });
@@ -200,9 +202,15 @@ var Game = /** @class */ (function () {
     Game.prototype.loadContext = function () {
         this.music = this.chart.loadMusic();
         this.context = new AudioContext();
-        this.source = this.context.createMediaElementSource(this.music);
-        this.source.connect(this.context.destination);
+        this.loadEffect();
         this.music.addEventListener("ended", function (event) { ended = true; });
+    };
+    Game.prototype.loadEffect = function () {
+        this.effect = new Effect(this.music, this.context);
+    };
+    Game.prototype.loadBg = function () {
+        var bg = document.querySelector(".Background");
+        bg.src = this.chart.illustration;
     };
     Game.prototype.start = function () {
         var _this = this;
@@ -218,9 +226,11 @@ var Game = /** @class */ (function () {
         for (var index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
+        requestAnimationFrame(this.effect.draw.bind(this.effect));
         if (ended) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = "MAX HIT: ".concat(max_hit);
+            this.effect.clear();
         }
         else {
             requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
@@ -239,6 +249,17 @@ var Game = /** @class */ (function () {
                     track.pop();
                     i -= 1;
                 }
+            }
+            if (auto && note.isPerfect(global_time)) {
+                HITBOX[index].style.background = HITPRESS;
+                TRACKS[index].style.background = TRACKPRESS;
+                score += track.pop();
+                SCORE.innerText = "SCORE: ".concat(score);
+                i -= 1;
+                setTimeout(function () {
+                    HITBOX[index].style.background = HITUP;
+                    TRACKS[index].style.background = TRACKUP;
+                }, 50);
             }
         }
     };
@@ -359,6 +380,9 @@ var Note = /** @class */ (function () {
     Note.prototype.draw = function (speed) {
         return true;
     };
+    Note.prototype.isPerfect = function (global_time) {
+        return false;
+    };
     Note.prototype.isMiss = function (global_time) {
         return true;
     };
@@ -372,6 +396,9 @@ var Tap = /** @class */ (function (_super) {
     function Tap(object, id) {
         return _super.call(this, object, id) || this;
     }
+    Tap.prototype.isPerfect = function (global_time) {
+        return this.judge(global_time)[0] == Judgement.Perfect;
+    };
     Tap.prototype.isMiss = function () {
         return this.judge(global_time)[0] == Judgement.Miss;
     };
@@ -424,6 +451,76 @@ var Tap = /** @class */ (function (_super) {
     };
     return Tap;
 }(Note));
+var Effect = /** @class */ (function () {
+    function Effect(audio, ctx) {
+        this.source = ctx.createMediaElementSource(audio);
+        this.analyser = ctx.createAnalyser();
+        this.analyser.fftSize = 128;
+        this.source.connect(this.analyser);
+        this.analyser.connect(ctx.destination);
+        this.array = new Uint8Array(this.analyser.frequencyBinCount);
+        this.canvas = document.querySelector(".Effect");
+        this.cvsCtx = this.canvas.getContext("2d");
+        this.style = 0.4;
+        this.styleBack = false;
+        this.salt = Math.random();
+    }
+    Object.defineProperty(Effect.prototype, "frequencyBinCount", {
+        get: function () {
+            return this.analyser.frequencyBinCount;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    Effect.prototype.clear = function () {
+        this.cvsCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    };
+    Effect.prototype.changeStyle = function () {
+        if (this.styleBack) {
+            this.style -= 0.01;
+        }
+        else {
+            this.style += 0.01;
+        }
+        if (this.style >= 0.6) {
+            this.style = 0.6;
+            this.styleBack = true;
+        }
+        else if (this.style <= 0.4) {
+            this.style = 0.4;
+            this.styleBack = false;
+        }
+    };
+    Effect.prototype.getColor = function (base) {
+        var color = [base * this.style, base / this.style, base];
+        if (this.salt <= 0.33) {
+        }
+        else if (this.salt <= 0.67) {
+            color.push(color.shift());
+        }
+        else {
+            color.unshift(color.pop());
+        }
+        return color;
+    };
+    Effect.prototype.draw = function () {
+        this.changeStyle();
+        var width = this.canvas.width / (this.frequencyBinCount * 2.5);
+        var height = this.canvas.height;
+        var x = 0;
+        this.clear();
+        var frequency;
+        this.analyser.getByteFrequencyData(this.array);
+        for (var index = 0; index < this.array.length; index++) {
+            frequency = this.array[index];
+            var rgb = this.getColor(frequency);
+            this.cvsCtx.fillStyle = "rgba(".concat(rgb[0], ", ").concat(rgb[1], ", ").concat(rgb[2], ", 0.8)");
+            this.cvsCtx.fillRect(x, height, width, -(frequency / 2.5));
+            x += width * 2.5;
+        }
+    };
+    return Effect;
+}());
 /** Main function
  *
  *  Integrates and choronously calls async functions, ensuring workflow.
@@ -440,24 +537,27 @@ function Main() {
                 case 2:
                     obj = _a.sent();
                     game = new Game(obj, 10);
-                    document.addEventListener("keypress", function (event) {
-                        var key = event.key.toUpperCase();
-                        var ki = key_bind.indexOf(key);
-                        if (ki != -1) {
-                            HITBOX[ki].style.background = HITPRESS;
-                            TRACKS[ki].style.background = TRACKPRESS;
-                            score += game.chart.tracks[ki].pop();
-                            SCORE.innerText = "SCORE: ".concat(score);
-                        }
-                    });
-                    document.addEventListener("keyup", function (event) {
-                        var key = event.key.toUpperCase();
-                        var ki = key_bind.indexOf(key);
-                        if (ki != -1) {
-                            HITBOX[ki].style.background = HITUP;
-                            TRACKS[ki].style.background = TRACKUP;
-                        }
-                    });
+                    game.loadBg();
+                    if (!auto) {
+                        document.addEventListener("keypress", function (event) {
+                            var key = event.key.toUpperCase();
+                            var ki = key_bind.indexOf(key);
+                            if (ki != -1) {
+                                HITBOX[ki].style.background = HITPRESS;
+                                TRACKS[ki].style.background = TRACKPRESS;
+                                score += game.chart.tracks[ki].pop();
+                                SCORE.innerText = "SCORE: ".concat(score);
+                            }
+                        });
+                        document.addEventListener("keyup", function (event) {
+                            var key = event.key.toUpperCase();
+                            var ki = key_bind.indexOf(key);
+                            if (ki != -1) {
+                                HITBOX[ki].style.background = HITUP;
+                                TRACKS[ki].style.background = TRACKUP;
+                            }
+                        });
+                    }
                     getReady(game);
                     return [2 /*return*/];
             }

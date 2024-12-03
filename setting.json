@@ -2,5 +2,6 @@
     "render-duration": 5000,
     "speed": 10,
     "key-bind": ["D", "F", "J", "K"],
-    "duration": 50
+    "duration": 50,
+    "auto": true
 }

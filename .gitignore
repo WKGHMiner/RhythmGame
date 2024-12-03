@@ -1,7 +1,11 @@
 /mcp/target
 
+/gce/target
+
 /node_modules
 
 package-lock.json
 
 package.json
+
+*.mc
