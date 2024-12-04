@@ -1,8 +1,8 @@
 {
 "name":"Override",
 "composer":"Nhato",
-"music":"../chart\\Nhato - Override.mp3",
-"illustration":"../chart\\Override.jpg",
+"music":"../chart/Nhato - Override.mp3",
+"illustration":"../chart/Override.jpg",
 "track":4,
 "notes":[
 {"time": 1028, "track": 0, "type": 0},

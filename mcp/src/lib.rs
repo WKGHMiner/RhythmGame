@@ -118,8 +118,8 @@ impl Chart {
         let notes = get_notes(&txt);
         let bpm = get_bpm(&txt);
 
-        music = format!("{}\\\\{}", dir, music);
-        illustration = format!("{}\\\\{}", dir, illustration);
+        music = format!("{}/{}", dir, music);
+        illustration = format!("{}/{}", dir, illustration);
 
         Self { dir, name, composer, music, illustration, track, bpm, notes }
     }
@@ -328,7 +328,7 @@ fn extract_chart_dir(path: &str) -> String {
         comps.pop();
     }
 
-    comps.join("\\")
+    comps.join("/")
 }
 
 

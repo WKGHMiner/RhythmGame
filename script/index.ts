@@ -69,13 +69,16 @@ async function readChart(name: string): Promise<Object> {
 }
 
 
-async function getReady(game: Game) {
-    document.addEventListener("keypress", event => {
+function getReady(game: Game) {
+    document.addEventListener("keydown", event => {
         if (!isReady) {
+            isReady = true;
+
             var prompt = document.querySelector(".Prompt") as HTMLDivElement;
             var mc = document.querySelector(".MainContainer") as HTMLDivElement;
             mc.removeChild(prompt);
-            isReady = true;
+            prompt.remove();
+            
             game.loadContext();
             game.start();
         }
@@ -176,8 +179,11 @@ class Game {
 
 
     loadBg() {
-        var bg = document.querySelector(".Background") as HTMLImageElement;
-        bg.src = this.chart.illustration;
+        var illustration = document.querySelector(".Illustration") as HTMLImageElement;
+        illustration.src = this.chart.illustration;
+
+        var bg = document.querySelector(".Background") as HTMLBodyElement;
+        bg.style.backgroundImage = `url(${this.chart.illustration})`;
     }
 
 
@@ -185,26 +191,26 @@ class Game {
         this.start_time = this.context.currentTime;
         this.music.play().then(() => {
             // This yields time tick., which is previously used as global time.
-            requestAnimationFrame(tick => this.drawAll(tick));
+            requestAnimationFrame(_ => this.drawAll());
         });
     }
 
     
-    drawAll(tick: number) {
+    drawAll() {
         global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
     
         for (let index = 0; index < this.chart.track; index ++) {
             this.drawSingleTrack(index);
         }
 
-        requestAnimationFrame(this.effect.draw.bind(this.effect));
+        requestAnimationFrame(_ => this.effect.draw());
     
         if (ended) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = `MAX HIT: ${max_hit}`;
             this.effect.clear();
         } else {
-            requestAnimationFrame(tick => this.drawAll(tick));
+            requestAnimationFrame(_ => this.drawAll());
         }
     }
 
@@ -513,11 +519,13 @@ class Effect {
     style: number;
     styleBack: boolean;
     salt: number;
+    radial: number;
+    theta: number;
 
     constructor(audio: HTMLAudioElement, ctx: AudioContext) {
         this.source = ctx.createMediaElementSource(audio);
         this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 128;
+        this.analyser.fftSize = 256;
         
         this.source.connect(this.analyser);
         this.analyser.connect(ctx.destination);
@@ -525,11 +533,22 @@ class Effect {
         this.array = new Uint8Array(this.analyser.frequencyBinCount);
         
         this.canvas = document.querySelector(".Effect") as HTMLCanvasElement;
+        this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
+        this.canvas.width = this.canvas.clientWidth * window.devicePixelRatio;
         this.cvsCtx = this.canvas.getContext("2d");
 
         this.style = 0.4;
         this.styleBack = false;
         this.salt = Math.random();
+        
+        var illustration = document.querySelector(".Illustration");
+        this.radial = illustration.clientHeight * 0.75;
+        this.theta = 0;
+    }
+
+
+    set fftSize(size: number) {
+        this.analyser.fftSize = size;
     }
 
 
@@ -545,16 +564,16 @@ class Effect {
 
     changeStyle() {
         if (this.styleBack) {
-            this.style -= 0.01
+            this.style -= 0.005;
         } else {
-            this.style += 0.01;
+            this.style += 0.005;
         }
     
-        if (this.style >= 0.6) {
-            this.style = 0.6;
+        if (this.style >= 0.75) {
+            this.style = 0.75;
             this.styleBack = true;
-        } else if (this.style <= 0.4) {
-            this.style = 0.4;
+        } else if (this.style <= 0.25) {
+            this.style = 0.25;
             this.styleBack = false;
         }
     }
@@ -575,25 +594,39 @@ class Effect {
     }
 
 
+    getTheta(): number {
+        var current = this.theta;
+        this.theta += 0.05;
+        this.theta %= this.frequencyBinCount;
+        return current;
+    }
+
+
     draw() {
         this.changeStyle();
-        var width = this.canvas.width / (this.frequencyBinCount * 2.5);
+        var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
+        var width = this.canvas.width / 2;
         var height = this.canvas.height;
-        var x: number = 0;
         
         this.clear();
         
-        var frequency: number;
+        var angle = Math.PI * 2 / this.frequencyBinCount;
+        this.cvsCtx.save();
+        this.cvsCtx.translate(width, height / 2);
+        this.cvsCtx.rotate(angle * this.getTheta());
+
         this.analyser.getByteFrequencyData(this.array);
-        for (var index = 0; index < this.array.length; index ++) {
-            frequency = this.array[index];
+        this.array.forEach(frequency => {
             var rgb = this.getColor(frequency);
 
-            this.cvsCtx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.8)`;
-            this.cvsCtx.fillRect(x, height, width, -(frequency / 2.5));
+            this.cvsCtx.rotate(angle);
 
-            x += width * 2.5;
-        }
+            this.cvsCtx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.8)`;
+            this.cvsCtx.fillRect(0, 0, bar_width, this.radial + frequency);
+        })
+
+        this.cvsCtx.translate(-width, -height / 2);
+        this.cvsCtx.restore();
     }
 }
 
@@ -610,7 +643,7 @@ async function Main() {
     game.loadBg();
 
     if (!auto) {
-        document.addEventListener("keypress", (event) => {
+        document.addEventListener("keydown", (event) => {
             var key = event.key.toUpperCase();
             var ki = key_bind.indexOf(key);
     

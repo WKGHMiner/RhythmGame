@@ -126,20 +126,16 @@ function readChart(name) {
     });
 }
 function getReady(game) {
-    return __awaiter(this, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            document.addEventListener("keypress", function (event) {
-                if (!isReady) {
-                    var prompt = document.querySelector(".Prompt");
-                    var mc = document.querySelector(".MainContainer");
-                    mc.removeChild(prompt);
-                    isReady = true;
-                    game.loadContext();
-                    game.start();
-                }
-            });
-            return [2 /*return*/];
-        });
+    document.addEventListener("keydown", function (event) {
+        if (!isReady) {
+            isReady = true;
+            var prompt = document.querySelector(".Prompt");
+            var mc = document.querySelector(".MainContainer");
+            mc.removeChild(prompt);
+            prompt.remove();
+            game.loadContext();
+            game.start();
+        }
     });
 }
 /** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
@@ -209,31 +205,33 @@ var Game = /** @class */ (function () {
         this.effect = new Effect(this.music, this.context);
     };
     Game.prototype.loadBg = function () {
+        var illustration = document.querySelector(".Illustration");
+        illustration.src = this.chart.illustration;
         var bg = document.querySelector(".Background");
-        bg.src = this.chart.illustration;
+        bg.style.backgroundImage = "url(".concat(this.chart.illustration, ")");
     };
     Game.prototype.start = function () {
         var _this = this;
         this.start_time = this.context.currentTime;
         this.music.play().then(function () {
             // This yields time tick., which is previously used as global time.
-            requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
+            requestAnimationFrame(function (_) { return _this.drawAll(); });
         });
     };
-    Game.prototype.drawAll = function (tick) {
+    Game.prototype.drawAll = function () {
         var _this = this;
         global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
         for (var index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
-        requestAnimationFrame(this.effect.draw.bind(this.effect));
+        requestAnimationFrame(function (_) { return _this.effect.draw(); });
         if (ended) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = "MAX HIT: ".concat(max_hit);
             this.effect.clear();
         }
         else {
-            requestAnimationFrame(function (tick) { return _this.drawAll(tick); });
+            requestAnimationFrame(function (_) { return _this.drawAll(); });
         }
     };
     Game.prototype.drawSingleTrack = function (index) {
@@ -455,16 +453,28 @@ var Effect = /** @class */ (function () {
     function Effect(audio, ctx) {
         this.source = ctx.createMediaElementSource(audio);
         this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 128;
+        this.analyser.fftSize = 256;
         this.source.connect(this.analyser);
         this.analyser.connect(ctx.destination);
         this.array = new Uint8Array(this.analyser.frequencyBinCount);
         this.canvas = document.querySelector(".Effect");
+        this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
+        this.canvas.width = this.canvas.clientWidth * window.devicePixelRatio;
         this.cvsCtx = this.canvas.getContext("2d");
         this.style = 0.4;
         this.styleBack = false;
         this.salt = Math.random();
+        var illustration = document.querySelector(".Illustration");
+        this.radial = illustration.clientHeight * 0.75;
+        this.theta = 0;
     }
+    Object.defineProperty(Effect.prototype, "fftSize", {
+        set: function (size) {
+            this.analyser.fftSize = size;
+        },
+        enumerable: false,
+        configurable: true
+    });
     Object.defineProperty(Effect.prototype, "frequencyBinCount", {
         get: function () {
             return this.analyser.frequencyBinCount;
@@ -477,17 +487,17 @@ var Effect = /** @class */ (function () {
     };
     Effect.prototype.changeStyle = function () {
         if (this.styleBack) {
-            this.style -= 0.01;
+            this.style -= 0.005;
         }
         else {
-            this.style += 0.01;
+            this.style += 0.005;
         }
-        if (this.style >= 0.6) {
-            this.style = 0.6;
+        if (this.style >= 0.75) {
+            this.style = 0.75;
             this.styleBack = true;
         }
-        else if (this.style <= 0.4) {
-            this.style = 0.4;
+        else if (this.style <= 0.25) {
+            this.style = 0.25;
             this.styleBack = false;
         }
     };
@@ -503,21 +513,32 @@ var Effect = /** @class */ (function () {
         }
         return color;
     };
+    Effect.prototype.getTheta = function () {
+        var current = this.theta;
+        this.theta += 0.05;
+        this.theta %= this.frequencyBinCount;
+        return current;
+    };
     Effect.prototype.draw = function () {
+        var _this = this;
         this.changeStyle();
-        var width = this.canvas.width / (this.frequencyBinCount * 2.5);
+        var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
+        var width = this.canvas.width / 2;
         var height = this.canvas.height;
-        var x = 0;
         this.clear();
-        var frequency;
+        var angle = Math.PI * 2 / this.frequencyBinCount;
+        this.cvsCtx.save();
+        this.cvsCtx.translate(width, height / 2);
+        this.cvsCtx.rotate(angle * this.getTheta());
         this.analyser.getByteFrequencyData(this.array);
-        for (var index = 0; index < this.array.length; index++) {
-            frequency = this.array[index];
-            var rgb = this.getColor(frequency);
-            this.cvsCtx.fillStyle = "rgba(".concat(rgb[0], ", ").concat(rgb[1], ", ").concat(rgb[2], ", 0.8)");
-            this.cvsCtx.fillRect(x, height, width, -(frequency / 2.5));
-            x += width * 2.5;
-        }
+        this.array.forEach(function (frequency) {
+            var rgb = _this.getColor(frequency);
+            _this.cvsCtx.rotate(angle);
+            _this.cvsCtx.fillStyle = "rgba(".concat(rgb[0], ", ").concat(rgb[1], ", ").concat(rgb[2], ", 0.8)");
+            _this.cvsCtx.fillRect(0, 0, bar_width, _this.radial + frequency);
+        });
+        this.cvsCtx.translate(-width, -height / 2);
+        this.cvsCtx.restore();
     };
     return Effect;
 }());
@@ -539,7 +560,7 @@ function Main() {
                     game = new Game(obj, 10);
                     game.loadBg();
                     if (!auto) {
-                        document.addEventListener("keypress", function (event) {
+                        document.addEventListener("keydown", function (event) {
                             var key = event.key.toUpperCase();
                             var ki = key_bind.indexOf(key);
                             if (ki != -1) {
