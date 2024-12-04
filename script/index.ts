@@ -22,9 +22,9 @@ const BAD_COLOR = "rgba(255, 47, 0, 0.6)";
 const MISS_COLOR = "rgba(255, 255, 255, 0.6)";
 
 // Key event style literals.
-const TRACKPRESS = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
+const TRACKDOWN = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
 const TRACKUP = "none";
-const HITPRESS = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
+const HITDOWN = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
 const HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
 
 // Setting parameters.
@@ -50,7 +50,8 @@ var current_hit: number = 0;
 var isReady: boolean = false;
 
 // Control signal.
-var ended: boolean = false;
+var isPaused: boolean = false;
+var isEnded: boolean = false;
 
 
 /** Read `setting.json` to update settings. */
@@ -81,6 +82,12 @@ function getReady(game: Game) {
             
             game.loadContext();
             game.start();
+
+            document.addEventListener("keydown", event => {
+                if (event.key == "Escape") {
+                    game.pause();
+                }
+            })
         }
     })
 }
@@ -152,10 +159,10 @@ function updateHit(judgement: Judgement) {
 class Game {
     speed: number;
     chart: Chart;
+    effect: Effect;
     music: HTMLAudioElement;
     context: AudioContext;
     start_time: number;
-    effect: Effect;
 
     constructor(obj: Object, speed: number) {
         this.chart = new Chart(obj);
@@ -169,7 +176,7 @@ class Game {
 
         this.loadEffect();
 
-        this.music.addEventListener("ended", event => { ended = true })
+        this.music.addEventListener("ended", event => { isEnded = true })
     }
 
 
@@ -184,6 +191,20 @@ class Game {
 
         var bg = document.querySelector(".Background") as HTMLBodyElement;
         bg.style.backgroundImage = `url(${this.chart.illustration})`;
+    }
+
+
+    pause() {
+        if (!isEnded && isPaused) {
+            this.context.resume();
+            this.music.play();
+            requestAnimationFrame(_ => this.drawAll());
+        } else {
+            this.music.pause();
+            this.context.suspend();
+        }
+
+        isPaused = !isPaused;
     }
 
 
@@ -205,12 +226,14 @@ class Game {
 
         requestAnimationFrame(_ => this.effect.draw());
     
-        if (ended) {
+        if (isEnded) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = `MAX HIT: ${max_hit}`;
             this.effect.clear();
         } else {
-            requestAnimationFrame(_ => this.drawAll());
+            if (!isPaused) {
+                requestAnimationFrame(_ => this.drawAll());
+            }
         }
     }
 
@@ -222,7 +245,7 @@ class Game {
             var should_remove = note.draw(this.speed);
 
             if (should_remove) {
-                if (note.isWaiting(global_time)) {
+                if (note.isWaiting()) {
                     break;
                 } else {
                     track.pop();
@@ -230,9 +253,9 @@ class Game {
                 }
             }
 
-            if (auto && note.isPerfect(global_time)) {
-                HITBOX[index].style.background = HITPRESS;
-                TRACKS[index].style.background = TRACKPRESS;
+            if (auto && note.isPerfect()) {
+                HITBOX[index].style.background = HITDOWN;
+                TRACKS[index].style.background = TRACKDOWN;
 
                 score += track.pop();
                 SCORE.innerText = `SCORE: ${score}`;
@@ -291,7 +314,23 @@ class Chart {
         notes.sort((a, b) => a["time"] - b["time"]);
 
         for (var index = 0; index < notes.length; index ++) {
-            var note = new Tap(notes[index], index);
+            var obj = notes[index];
+            var note: Note;
+
+            switch (obj["type"]) {
+                case 0:
+                    note = new Tap(obj, index);
+                    break;
+
+                case 1:
+                    note = new ExTap(obj, index);
+                    break;
+
+                default:
+                    note = new Note(obj, index);
+                    break;
+            }
+
             this.tracks[note.track].push(note);
         }
     }
@@ -388,11 +427,11 @@ interface Base {
      */
     draw(speed: number): boolean;
 
-    isPerfect(global_time: number): boolean;
+    isPerfect(): boolean;
 
-    isMiss(global_time: number): boolean;
+    isMiss(): boolean;
 
-    isWaiting(global_time: number): boolean;
+    isWaiting(): boolean;
 }
 
 
@@ -422,29 +461,7 @@ class Note implements Base {
     }
 
 
-    isPerfect(global_time: number): boolean {
-        return false;
-    }
-
-
-    isMiss(global_time: number): boolean {
-        return true;
-    }
-
-
-    isWaiting(global_time: number): boolean {
-        return false;
-    }
-}
-
-
-class Tap extends Note {
-    constructor(object: Object, id: number) {
-        super(object, id);
-    }
-
-
-    isPerfect(global_time: number): boolean {
+    isPerfect(): boolean {
         return this.judge(global_time)[0] == Judgement.Perfect;
     }
 
@@ -456,6 +473,13 @@ class Tap extends Note {
 
     isWaiting(): boolean {
         return this.judge(global_time)[0] == Judgement.Waiting;
+    }
+}
+
+
+class Tap extends Note {
+    constructor(object: Object, id: number) {
+        super(object, id);
     }
 
 
@@ -510,6 +534,39 @@ class Tap extends Note {
 }
 
 
+class ExTap extends Tap {
+    judge(current: number): [Judgement, number] {
+        var gap = current - this.time;
+
+        if (gap >= (duration * 3)) {
+            return [Judgement.Miss, 0];
+        } else if (gap <= -(duration * 2)) {
+            return [Judgement.Waiting, 0];
+        } else {
+            if (auto && Math.abs(gap) < duration) {
+                return [Judgement.Perfect, 1500];
+            } else if (!auto) {
+                return [Judgement.Perfect, 1500];
+            } else {
+                return [Judgement.Waiting, 0];
+            }
+        }
+    }
+
+
+    draw(speed: number): boolean {
+        var res = super.draw(speed);
+        var elem = document.getElementById("Note" + this.id) as HTMLDivElement | null;
+
+        if (elem) {
+            elem.className = "ExTap";
+        }
+
+        return res;
+    }
+}
+
+
 class Effect {
     analyser: AnalyserNode;
     source: MediaElementAudioSourceNode
@@ -553,7 +610,7 @@ class Effect {
 
 
     get frequencyBinCount(): number {
-        return this.analyser.frequencyBinCount;
+        return this.analyser.frequencyBinCount / 4 * 3;
     }
 
 
@@ -616,14 +673,15 @@ class Effect {
         this.cvsCtx.rotate(angle * this.getTheta());
 
         this.analyser.getByteFrequencyData(this.array);
-        this.array.forEach(frequency => {
+        for (var index = this.array.length / 4; index < this.array.length; index ++) {
+            var frequency = this.array[index];
             var rgb = this.getColor(frequency);
 
             this.cvsCtx.rotate(angle);
 
             this.cvsCtx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.8)`;
-            this.cvsCtx.fillRect(0, 0, bar_width, this.radial + frequency);
-        })
+            this.cvsCtx.fillRect(0, this.radial, bar_width, frequency);
+        }
 
         this.cvsCtx.translate(-width, -height / 2);
         this.cvsCtx.restore();
@@ -644,24 +702,28 @@ async function Main() {
 
     if (!auto) {
         document.addEventListener("keydown", (event) => {
-            var key = event.key.toUpperCase();
-            var ki = key_bind.indexOf(key);
-    
-            if (ki != -1) {
-                HITBOX[ki].style.background = HITPRESS;
-                TRACKS[ki].style.background = TRACKPRESS;
-                score += game.chart.tracks[ki].pop();
-                SCORE.innerText = `SCORE: ${score}`;
+            if (!isPaused) {
+                var key = event.key.toUpperCase();
+                var ki = key_bind.indexOf(key);
+        
+                if (ki != -1) {
+                    HITBOX[ki].style.background = HITDOWN;
+                    TRACKS[ki].style.background = TRACKDOWN;
+                    score += game.chart.tracks[ki].pop();
+                    SCORE.innerText = `SCORE: ${score}`;
+                }
             }
         });
     
         document.addEventListener("keyup", (event) => {
-            var key = event.key.toUpperCase();
-            var ki = key_bind.indexOf(key);
-    
-            if (ki != -1) {
-                HITBOX[ki].style.background = HITUP;
-                TRACKS[ki].style.background = TRACKUP;
+            if (!isPaused) {
+                var key = event.key.toUpperCase();
+                var ki = key_bind.indexOf(key);
+        
+                if (ki != -1) {
+                    HITBOX[ki].style.background = HITUP;
+                    TRACKS[ki].style.background = TRACKUP;
+                }
             }
         });
     }

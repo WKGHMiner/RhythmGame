@@ -69,9 +69,9 @@ var GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
 var BAD_COLOR = "rgba(255, 47, 0, 0.6)";
 var MISS_COLOR = "rgba(255, 255, 255, 0.6)";
 // Key event style literals.
-var TRACKPRESS = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
+var TRACKDOWN = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
 var TRACKUP = "none";
-var HITPRESS = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
+var HITDOWN = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
 var HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
 // Setting parameters.
 var setting;
@@ -92,7 +92,8 @@ var current_hit = 0;
 // Status signal.
 var isReady = false;
 // Control signal.
-var ended = false;
+var isPaused = false;
+var isEnded = false;
 /** Read `setting.json` to update settings. */
 function readSetting() {
     return __awaiter(this, void 0, void 0, function () {
@@ -135,6 +136,11 @@ function getReady(game) {
             prompt.remove();
             game.loadContext();
             game.start();
+            document.addEventListener("keydown", function (event) {
+                if (event.key == "Escape") {
+                    game.pause();
+                }
+            });
         }
     });
 }
@@ -199,7 +205,7 @@ var Game = /** @class */ (function () {
         this.music = this.chart.loadMusic();
         this.context = new AudioContext();
         this.loadEffect();
-        this.music.addEventListener("ended", function (event) { ended = true; });
+        this.music.addEventListener("ended", function (event) { isEnded = true; });
     };
     Game.prototype.loadEffect = function () {
         this.effect = new Effect(this.music, this.context);
@@ -209,6 +215,19 @@ var Game = /** @class */ (function () {
         illustration.src = this.chart.illustration;
         var bg = document.querySelector(".Background");
         bg.style.backgroundImage = "url(".concat(this.chart.illustration, ")");
+    };
+    Game.prototype.pause = function () {
+        var _this = this;
+        if (!isEnded && isPaused) {
+            this.context.resume();
+            this.music.play();
+            requestAnimationFrame(function (_) { return _this.drawAll(); });
+        }
+        else {
+            this.music.pause();
+            this.context.suspend();
+        }
+        isPaused = !isPaused;
     };
     Game.prototype.start = function () {
         var _this = this;
@@ -225,13 +244,15 @@ var Game = /** @class */ (function () {
             this.drawSingleTrack(index);
         }
         requestAnimationFrame(function (_) { return _this.effect.draw(); });
-        if (ended) {
+        if (isEnded) {
             JUDGEMENT.innerText = "";
             HIT_COUNT.innerText = "MAX HIT: ".concat(max_hit);
             this.effect.clear();
         }
         else {
-            requestAnimationFrame(function (_) { return _this.drawAll(); });
+            if (!isPaused) {
+                requestAnimationFrame(function (_) { return _this.drawAll(); });
+            }
         }
     };
     Game.prototype.drawSingleTrack = function (index) {
@@ -240,7 +261,7 @@ var Game = /** @class */ (function () {
             var note = track.notes[i];
             var should_remove = note.draw(this.speed);
             if (should_remove) {
-                if (note.isWaiting(global_time)) {
+                if (note.isWaiting()) {
                     break;
                 }
                 else {
@@ -248,9 +269,9 @@ var Game = /** @class */ (function () {
                     i -= 1;
                 }
             }
-            if (auto && note.isPerfect(global_time)) {
-                HITBOX[index].style.background = HITPRESS;
-                TRACKS[index].style.background = TRACKPRESS;
+            if (auto && note.isPerfect()) {
+                HITBOX[index].style.background = HITDOWN;
+                TRACKS[index].style.background = TRACKDOWN;
                 score += track.pop();
                 SCORE.innerText = "SCORE: ".concat(score);
                 i -= 1;
@@ -290,7 +311,19 @@ var Chart = /** @class */ (function () {
         var notes = object["notes"];
         notes.sort(function (a, b) { return a["time"] - b["time"]; });
         for (var index = 0; index < notes.length; index++) {
-            var note = new Tap(notes[index], index);
+            var obj = notes[index];
+            var note;
+            switch (obj["type"]) {
+                case 0:
+                    note = new Tap(obj, index);
+                    break;
+                case 1:
+                    note = new ExTap(obj, index);
+                    break;
+                default:
+                    note = new Note(obj, index);
+                    break;
+            }
             this.tracks[note.track].push(note);
         }
     };
@@ -378,14 +411,14 @@ var Note = /** @class */ (function () {
     Note.prototype.draw = function (speed) {
         return true;
     };
-    Note.prototype.isPerfect = function (global_time) {
-        return false;
+    Note.prototype.isPerfect = function () {
+        return this.judge(global_time)[0] == Judgement.Perfect;
     };
-    Note.prototype.isMiss = function (global_time) {
-        return true;
+    Note.prototype.isMiss = function () {
+        return this.judge(global_time)[0] == Judgement.Miss;
     };
-    Note.prototype.isWaiting = function (global_time) {
-        return false;
+    Note.prototype.isWaiting = function () {
+        return this.judge(global_time)[0] == Judgement.Waiting;
     };
     return Note;
 }());
@@ -394,15 +427,6 @@ var Tap = /** @class */ (function (_super) {
     function Tap(object, id) {
         return _super.call(this, object, id) || this;
     }
-    Tap.prototype.isPerfect = function (global_time) {
-        return this.judge(global_time)[0] == Judgement.Perfect;
-    };
-    Tap.prototype.isMiss = function () {
-        return this.judge(global_time)[0] == Judgement.Miss;
-    };
-    Tap.prototype.isWaiting = function () {
-        return this.judge(global_time)[0] == Judgement.Waiting;
-    };
     Tap.prototype.judge = function (current) {
         var gap = current - this.time;
         if (gap >= (duration * 3)) {
@@ -449,6 +473,41 @@ var Tap = /** @class */ (function (_super) {
     };
     return Tap;
 }(Note));
+var ExTap = /** @class */ (function (_super) {
+    __extends(ExTap, _super);
+    function ExTap() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    ExTap.prototype.judge = function (current) {
+        var gap = current - this.time;
+        if (gap >= (duration * 3)) {
+            return [Judgement.Miss, 0];
+        }
+        else if (gap <= -(duration * 2)) {
+            return [Judgement.Waiting, 0];
+        }
+        else {
+            if (auto && Math.abs(gap) < duration) {
+                return [Judgement.Perfect, 1500];
+            }
+            else if (!auto) {
+                return [Judgement.Perfect, 1500];
+            }
+            else {
+                return [Judgement.Waiting, 0];
+            }
+        }
+    };
+    ExTap.prototype.draw = function (speed) {
+        var res = _super.prototype.draw.call(this, speed);
+        var elem = document.getElementById("Note" + this.id);
+        if (elem) {
+            elem.className = "ExTap";
+        }
+        return res;
+    };
+    return ExTap;
+}(Tap));
 var Effect = /** @class */ (function () {
     function Effect(audio, ctx) {
         this.source = ctx.createMediaElementSource(audio);
@@ -477,7 +536,7 @@ var Effect = /** @class */ (function () {
     });
     Object.defineProperty(Effect.prototype, "frequencyBinCount", {
         get: function () {
-            return this.analyser.frequencyBinCount;
+            return this.analyser.frequencyBinCount / 4 * 3;
         },
         enumerable: false,
         configurable: true
@@ -520,7 +579,6 @@ var Effect = /** @class */ (function () {
         return current;
     };
     Effect.prototype.draw = function () {
-        var _this = this;
         this.changeStyle();
         var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
         var width = this.canvas.width / 2;
@@ -531,12 +589,13 @@ var Effect = /** @class */ (function () {
         this.cvsCtx.translate(width, height / 2);
         this.cvsCtx.rotate(angle * this.getTheta());
         this.analyser.getByteFrequencyData(this.array);
-        this.array.forEach(function (frequency) {
-            var rgb = _this.getColor(frequency);
-            _this.cvsCtx.rotate(angle);
-            _this.cvsCtx.fillStyle = "rgba(".concat(rgb[0], ", ").concat(rgb[1], ", ").concat(rgb[2], ", 0.8)");
-            _this.cvsCtx.fillRect(0, 0, bar_width, _this.radial + frequency);
-        });
+        for (var index = this.array.length / 4; index < this.array.length; index++) {
+            var frequency = this.array[index];
+            var rgb = this.getColor(frequency);
+            this.cvsCtx.rotate(angle);
+            this.cvsCtx.fillStyle = "rgba(".concat(rgb[0], ", ").concat(rgb[1], ", ").concat(rgb[2], ", 0.8)");
+            this.cvsCtx.fillRect(0, this.radial, bar_width, frequency);
+        }
         this.cvsCtx.translate(-width, -height / 2);
         this.cvsCtx.restore();
     };
@@ -561,21 +620,25 @@ function Main() {
                     game.loadBg();
                     if (!auto) {
                         document.addEventListener("keydown", function (event) {
-                            var key = event.key.toUpperCase();
-                            var ki = key_bind.indexOf(key);
-                            if (ki != -1) {
-                                HITBOX[ki].style.background = HITPRESS;
-                                TRACKS[ki].style.background = TRACKPRESS;
-                                score += game.chart.tracks[ki].pop();
-                                SCORE.innerText = "SCORE: ".concat(score);
+                            if (!isPaused) {
+                                var key = event.key.toUpperCase();
+                                var ki = key_bind.indexOf(key);
+                                if (ki != -1) {
+                                    HITBOX[ki].style.background = HITDOWN;
+                                    TRACKS[ki].style.background = TRACKDOWN;
+                                    score += game.chart.tracks[ki].pop();
+                                    SCORE.innerText = "SCORE: ".concat(score);
+                                }
                             }
                         });
                         document.addEventListener("keyup", function (event) {
-                            var key = event.key.toUpperCase();
-                            var ki = key_bind.indexOf(key);
-                            if (ki != -1) {
-                                HITBOX[ki].style.background = HITUP;
-                                TRACKS[ki].style.background = TRACKUP;
+                            if (!isPaused) {
+                                var key = event.key.toUpperCase();
+                                var ki = key_bind.indexOf(key);
+                                if (ki != -1) {
+                                    HITBOX[ki].style.background = HITUP;
+                                    TRACKS[ki].style.background = TRACKUP;
+                                }
                             }
                         });
                     }
