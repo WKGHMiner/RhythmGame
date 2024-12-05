@@ -62,6 +62,14 @@ static ILLUSTRATION_PATTERN: Lazy<Regex> = Lazy::new(|| {
 });
 
 
+static OFFSET_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r#""offset":(\d+)"#
+    )
+    .unwrap()
+});
+
+
 struct Tap {
     beat: [i32; 3],
     track: i32,
@@ -88,6 +96,7 @@ struct Chart {
     composer: String,
     music: String,
     illustration: String,
+    offset: i32,
     track: i32,
     bpm: f32,
     notes: Vec<Tap>,
@@ -114,6 +123,7 @@ impl Chart {
         let composer = get_composer(&txt);
         let mut music = get_music(&txt);
         let mut illustration = get_illustration(&txt);
+        let offset = get_offset(&txt);
         let track = get_track(&txt);
         let notes = get_notes(&txt);
         let bpm = get_bpm(&txt);
@@ -121,7 +131,7 @@ impl Chart {
         music = format!("{}/{}", dir, music);
         illustration = format!("{}/{}", dir, illustration);
 
-        Self { dir, name, composer, music, illustration, track, bpm, notes }
+        Self { dir, name, composer, music, illustration, offset, track, bpm, notes }
     }
 
 
@@ -145,6 +155,7 @@ impl Chart {
         self.write_composer(&mut handle);
         self.write_music(&mut handle);
         self.write_illustration(&mut handle);
+        self.write_offset(&mut handle);
         self.write_track(&mut handle);
         self.write_notes(&mut handle);
 
@@ -172,6 +183,12 @@ impl Chart {
 
     fn write_illustration(&self, handle: &mut fs::File) {
         let formatted = format!("\"illustration\":\"{}\",\n", self.illustration);
+        let _ = handle.write(formatted.as_bytes());
+    }
+
+
+    fn write_offset(&self, handle: &mut fs::File) {
+        let formatted = format!("\"offset\":{},\n", self.offset);
         let _ = handle.write(formatted.as_bytes());
     }
 
@@ -296,6 +313,17 @@ fn get_illustration(text: &str) -> String {
         cap[1].to_string()
     } else {
         String::from("test.jpg")
+    }
+}
+
+
+fn get_offset(text: &str) -> i32 {
+    let Some(cap) = OFFSET_PATTERN.captures(text) else {panic!("Failed to capture")};
+
+    if cap.len() == 2 {
+        cap[1].parse().unwrap()
+    } else {
+        0
     }
 }
 

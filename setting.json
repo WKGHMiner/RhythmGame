@@ -3,5 +3,8 @@
     "speed": 10,
     "key-bind": ["D", "F", "J", "K"],
     "duration": 50,
+    "offset": 0,
+    "music-volume": 0.4,
+    "sound-volume": 0.5,
     "auto": true
 }

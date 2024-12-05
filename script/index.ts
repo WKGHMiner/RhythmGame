@@ -8,6 +8,8 @@ const JUDGEMENT = document.querySelector(".Judgement") as HTMLDivElement;
 /** HTML element of Score. */
 const SCORE = document.querySelector(".Score") as HTMLDivElement;
 
+const PAUSED = document.querySelector(".Paused") as HTMLDivElement;
+
 // Counter elements.
 const PERFECT_COUNT = document.querySelector(".PerfectCount") as HTMLDivElement;
 const GOOD_COUNT = document.querySelector(".GoodCount") as HTMLDivElement;
@@ -33,6 +35,9 @@ var key_bind: string[];
 var render_duration: number = 500;
 var duration: number = 40;
 var auto: boolean = false;
+var offset: number = 0;
+var mvolume: number = 0.4;
+var svolume: number = 0.5;
 
 // Global time counter.
 var global_time: number = 0;
@@ -61,6 +66,8 @@ async function readSetting() {
     render_duration = setting["render-duration"];
     duration = setting["duration"];
     auto = setting["auto"];
+    mvolume = setting["music-volume"];
+    svolume = setting["sound-volume"];
 }
 
 
@@ -156,22 +163,38 @@ function updateHit(judgement: Judgement) {
 }
 
 
+function pressOn(index: number) {
+    HITBOX[index].style.background = HITDOWN;
+    TRACKS[index].style.background = TRACKDOWN;
+    SCORE.innerText = `SCORE: ${score}`;
+}
+
+
+function pressOut(index: number) {
+    HITBOX[index].style.background = HITUP;
+    TRACKS[index].style.background = TRACKUP;
+}
+
+
 class Game {
     speed: number;
     chart: Chart;
     effect: Effect;
+    start_time: number;
+    offset: number;
     music: HTMLAudioElement;
     context: AudioContext;
-    start_time: number;
 
     constructor(obj: Object, speed: number) {
         this.chart = new Chart(obj);
         this.speed = speed;
+        this.offset = this.chart.offset + offset;
     }
     
     
     loadContext() {
         this.music = this.chart.loadMusic();
+        this.music.volume = mvolume;
         this.context = new AudioContext();
 
         this.loadEffect();
@@ -196,10 +219,12 @@ class Game {
 
     pause() {
         if (!isEnded && isPaused) {
+            PAUSED.style.visibility = "hidden";
             this.context.resume();
             this.music.play();
             requestAnimationFrame(_ => this.drawAll());
         } else {
+            PAUSED.style.visibility = "visible";
             this.music.pause();
             this.context.suspend();
         }
@@ -218,7 +243,7 @@ class Game {
 
     
     drawAll() {
-        global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
+        global_time = Math.fround((this.context.currentTime - this.start_time) * 1000) + this.offset;
     
         for (let index = 0; index < this.chart.track; index ++) {
             this.drawSingleTrack(index);
@@ -248,25 +273,24 @@ class Game {
                 if (note.isWaiting()) {
                     break;
                 } else {
-                    track.pop();
+                    track.pop(this.context);
                     i -= 1;
                 }
             }
 
             if (auto && note.isPerfect()) {
-                HITBOX[index].style.background = HITDOWN;
-                TRACKS[index].style.background = TRACKDOWN;
-
-                score += track.pop();
-                SCORE.innerText = `SCORE: ${score}`;
+                score += track.pop(this.context);
+                pressOn(index);
                 i -= 1;
 
-                setTimeout(function() {
-                    HITBOX[index].style.background = HITUP;
-                    TRACKS[index].style.background = TRACKUP;
-                }, 50);
+                setTimeout(_ => pressOut(index), duration);
             }
         }
+    }
+
+
+    hit(index: number): number {
+        return this.chart.tracks[index].pop(this.context);
     }
 }
 
@@ -282,6 +306,7 @@ class Chart {
     illustration: string;
     tracks: Track[];
     track: number;
+    offset: number;
 
     constructor(object: Object) {
         this.name = object["name"];
@@ -290,6 +315,7 @@ class Chart {
         this.illustration = object["illustration"];
         this.track = object["track"];
         this.tracks = [];
+        this.offset = object["offset"];
 
         for (var _ = 0; _ < this.track; _ ++) {
             this.tracks.push(new Track());
@@ -362,7 +388,7 @@ class Track {
      * Trys to pop out notes based on `global_time`,
      * and return the score based on judgement.
      */
-    pop(): number {
+    pop(context: AudioContext): number {
         if (this.length == 0) {
             return 0;
         }
@@ -389,6 +415,10 @@ class Track {
                 break;
         }
 
+        if (res[0] != Judgement.Miss) {
+            this.hitSound(context, res[2]);
+        }
+
         showJudgement(res[0]);
         updateHit(res[0]);
         this.deleteHead();
@@ -407,6 +437,28 @@ class Track {
 
         this.length -= 1;
     }
+
+
+    async hitSound(context: AudioContext, type: number) {
+        var path: string = Note.matchType(type);
+        var audio = await (await fetch(path)).arrayBuffer();
+        var buffer = await context.decodeAudioData(audio);
+
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+
+        const gain = context.createGain();
+        source.connect(gain);
+        gain.connect(context.destination);
+
+        gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
+        source.start(0);
+
+        source.onended = () => {
+            source.disconnect(context.destination);
+            gain.disconnect(context.destination);
+        }
+    }
 }
 
 
@@ -419,7 +471,7 @@ enum Judgement { Waiting, Perfect, Good, Bad, Miss }
 
 interface Base {
     /** Returns the judgement of note. */
-    judge(current: number): [Judgement, number];
+    judge(current: number): [Judgement, number, number];
 
     /**
      * Draws this note on the screen,
@@ -442,17 +494,19 @@ interface Base {
 class Note implements Base {
     time: number;
     track: number;
+    type: number;
     id: number;
 
     constructor (object: Object, id: number) {
         this.time = object["time"];
         this.track = object["track"];
+        this.type = object["type"];
         this.id = id;
     }
 
 
-    judge(current: number): [Judgement, number] {
-        return [Judgement.Miss, 0];
+    judge(current: number): [Judgement, number, number] {
+        return [Judgement.Miss, 0, 0];
     }
 
 
@@ -474,6 +528,18 @@ class Note implements Base {
     isWaiting(): boolean {
         return this.judge(global_time)[0] == Judgement.Waiting;
     }
+
+
+    static matchType(type: number): string {
+        var path = "../resource/sound/";
+        switch (type) {
+            case 1:
+                return path + "extap.mp3";
+
+            default:
+                return path + "tap.mp3";
+        }
+    }
 }
 
 
@@ -483,25 +549,23 @@ class Tap extends Note {
     }
 
 
-    judge(current: number): [Judgement, number] {
+    judge(current: number): [Judgement, number, number] {
         var gap = current - this.time;
 
         if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0];
+            return [Judgement.Miss, 0, 0];
         } else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0];
+            return [Judgement.Waiting, 0, 0];
         }
 
-        if (gap < 0) {
-            gap = -gap * 1.5;
-        }
+        gap = Math.abs(gap);
 
         if (gap <= duration) {
-            return [Judgement.Perfect, 1500];
+            return [Judgement.Perfect, 1500, 0];
         } else if (gap <= duration * 2) {
-            return [Judgement.Good, 1000];
+            return [Judgement.Good, 1000, 0];
         } else {
-            return [Judgement.Bad, 500];
+            return [Judgement.Bad, 500, 0];
         }
     }
 
@@ -535,20 +599,18 @@ class Tap extends Note {
 
 
 class ExTap extends Tap {
-    judge(current: number): [Judgement, number] {
+    judge(current: number): [Judgement, number, number] {
         var gap = current - this.time;
 
         if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0];
+            return [Judgement.Miss, 0, 1];
         } else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0];
+            return [Judgement.Waiting, 0, 1];
         } else {
-            if (auto && Math.abs(gap) < duration) {
-                return [Judgement.Perfect, 1500];
-            } else if (!auto) {
-                return [Judgement.Perfect, 1500];
+            if ((auto && Math.abs(gap) < duration) || !auto) {
+                return [Judgement.Perfect, 1500, 1];
             } else {
-                return [Judgement.Waiting, 0];
+                return [Judgement.Waiting, 0, 1];
             }
         }
     }
@@ -707,10 +769,8 @@ async function Main() {
                 var ki = key_bind.indexOf(key);
         
                 if (ki != -1) {
-                    HITBOX[ki].style.background = HITDOWN;
-                    TRACKS[ki].style.background = TRACKDOWN;
-                    score += game.chart.tracks[ki].pop();
-                    SCORE.innerText = `SCORE: ${score}`;
+                    score += game.hit(ki);
+                    pressOn(ki);
                 }
             }
         });
@@ -721,8 +781,7 @@ async function Main() {
                 var ki = key_bind.indexOf(key);
         
                 if (ki != -1) {
-                    HITBOX[ki].style.background = HITUP;
-                    TRACKS[ki].style.background = TRACKUP;
+                    pressOut(ki);
                 }
             }
         });

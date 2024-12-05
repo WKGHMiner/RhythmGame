@@ -57,6 +57,7 @@ var HITBOX = document.querySelectorAll(".HitBox");
 var JUDGEMENT = document.querySelector(".Judgement");
 /** HTML element of Score. */
 var SCORE = document.querySelector(".Score");
+var PAUSED = document.querySelector(".Paused");
 // Counter elements.
 var PERFECT_COUNT = document.querySelector(".PerfectCount");
 var GOOD_COUNT = document.querySelector(".GoodCount");
@@ -79,6 +80,9 @@ var key_bind;
 var render_duration = 500;
 var duration = 40;
 var auto = false;
+var offset = 0;
+var mvolume = 0.8;
+var svolume = 0.5;
 // Global time counter.
 var global_time = 0;
 // Statistic variables.
@@ -107,6 +111,8 @@ function readSetting() {
                     render_duration = setting["render-duration"];
                     duration = setting["duration"];
                     auto = setting["auto"];
+                    mvolume = setting["music-volume"];
+                    svolume = setting["sound-volume"];
                     return [2 /*return*/];
             }
         });
@@ -196,13 +202,24 @@ function updateHit(judgement) {
         HIT_COUNT.innerText = "";
     }
 }
+function pressOn(index) {
+    HITBOX[index].style.background = HITDOWN;
+    TRACKS[index].style.background = TRACKDOWN;
+    SCORE.innerText = "SCORE: ".concat(score);
+}
+function pressOut(index) {
+    HITBOX[index].style.background = HITUP;
+    TRACKS[index].style.background = TRACKUP;
+}
 var Game = /** @class */ (function () {
     function Game(obj, speed) {
         this.chart = new Chart(obj);
         this.speed = speed;
+        this.offset = this.chart.offset + offset;
     }
     Game.prototype.loadContext = function () {
         this.music = this.chart.loadMusic();
+        this.music.volume = mvolume;
         this.context = new AudioContext();
         this.loadEffect();
         this.music.addEventListener("ended", function (event) { isEnded = true; });
@@ -219,11 +236,13 @@ var Game = /** @class */ (function () {
     Game.prototype.pause = function () {
         var _this = this;
         if (!isEnded && isPaused) {
+            PAUSED.style.visibility = "hidden";
             this.context.resume();
             this.music.play();
             requestAnimationFrame(function (_) { return _this.drawAll(); });
         }
         else {
+            PAUSED.style.visibility = "visible";
             this.music.pause();
             this.context.suspend();
         }
@@ -239,7 +258,7 @@ var Game = /** @class */ (function () {
     };
     Game.prototype.drawAll = function () {
         var _this = this;
-        global_time = Math.fround((this.context.currentTime - this.start_time) * 1000);
+        global_time = Math.fround((this.context.currentTime - this.start_time) * 1000) + this.offset;
         for (var index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
@@ -265,22 +284,20 @@ var Game = /** @class */ (function () {
                     break;
                 }
                 else {
-                    track.pop();
+                    track.pop(this.context);
                     i -= 1;
                 }
             }
             if (auto && note.isPerfect()) {
-                HITBOX[index].style.background = HITDOWN;
-                TRACKS[index].style.background = TRACKDOWN;
-                score += track.pop();
-                SCORE.innerText = "SCORE: ".concat(score);
+                score += track.pop(this.context);
+                pressOn(index);
                 i -= 1;
-                setTimeout(function () {
-                    HITBOX[index].style.background = HITUP;
-                    TRACKS[index].style.background = TRACKUP;
-                }, 50);
+                setTimeout(function (_) { return pressOut(index); }, duration);
             }
         }
+    };
+    Game.prototype.hit = function (index) {
+        return this.chart.tracks[index].pop(this.context);
     };
     return Game;
 }());
@@ -296,6 +313,7 @@ var Chart = /** @class */ (function () {
         this.illustration = object["illustration"];
         this.track = object["track"];
         this.tracks = [];
+        this.offset = object["offset"];
         for (var _ = 0; _ < this.track; _++) {
             this.tracks.push(new Track());
         }
@@ -346,7 +364,7 @@ var Track = /** @class */ (function () {
      * Trys to pop out notes based on `global_time`,
      * and return the score based on judgement.
      */
-    Track.prototype.pop = function () {
+    Track.prototype.pop = function (context) {
         if (this.length == 0) {
             return 0;
         }
@@ -367,6 +385,9 @@ var Track = /** @class */ (function () {
                 bad_count += 1;
                 break;
         }
+        if (res[0] != Judgement.Miss) {
+            this.hitSound(context, res[2]);
+        }
         showJudgement(res[0]);
         updateHit(res[0]);
         this.deleteHead();
@@ -380,6 +401,36 @@ var Track = /** @class */ (function () {
             node.remove();
         }
         this.length -= 1;
+    };
+    Track.prototype.hitSound = function (context, type) {
+        return __awaiter(this, void 0, void 0, function () {
+            var path, audio, buffer, source, gain;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        path = Note.matchType(type);
+                        return [4 /*yield*/, fetch(path)];
+                    case 1: return [4 /*yield*/, (_a.sent()).arrayBuffer()];
+                    case 2:
+                        audio = _a.sent();
+                        return [4 /*yield*/, context.decodeAudioData(audio)];
+                    case 3:
+                        buffer = _a.sent();
+                        source = context.createBufferSource();
+                        source.buffer = buffer;
+                        gain = context.createGain();
+                        source.connect(gain);
+                        gain.connect(context.destination);
+                        gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
+                        source.start(0);
+                        source.onended = function () {
+                            source.disconnect(context.destination);
+                            gain.disconnect(context.destination);
+                        };
+                        return [2 /*return*/];
+                }
+            });
+        });
     };
     return Track;
 }());
@@ -403,10 +454,11 @@ var Note = /** @class */ (function () {
     function Note(object, id) {
         this.time = object["time"];
         this.track = object["track"];
+        this.type = object["type"];
         this.id = id;
     }
     Note.prototype.judge = function (current) {
-        return [Judgement.Miss, 0];
+        return [Judgement.Miss, 0, 0];
     };
     Note.prototype.draw = function (speed) {
         return true;
@@ -420,6 +472,15 @@ var Note = /** @class */ (function () {
     Note.prototype.isWaiting = function () {
         return this.judge(global_time)[0] == Judgement.Waiting;
     };
+    Note.matchType = function (type) {
+        var path = "../resource/sound/";
+        switch (type) {
+            case 1:
+                return path + "extap.mp3";
+            default:
+                return path + "tap.mp3";
+        }
+    };
     return Note;
 }());
 var Tap = /** @class */ (function (_super) {
@@ -430,22 +491,20 @@ var Tap = /** @class */ (function (_super) {
     Tap.prototype.judge = function (current) {
         var gap = current - this.time;
         if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0];
+            return [Judgement.Miss, 0, 0];
         }
         else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0];
+            return [Judgement.Waiting, 0, 0];
         }
-        if (gap < 0) {
-            gap = -gap * 1.5;
-        }
+        gap = Math.abs(gap);
         if (gap <= duration) {
-            return [Judgement.Perfect, 1500];
+            return [Judgement.Perfect, 1500, 0];
         }
         else if (gap <= duration * 2) {
-            return [Judgement.Good, 1000];
+            return [Judgement.Good, 1000, 0];
         }
         else {
-            return [Judgement.Bad, 500];
+            return [Judgement.Bad, 500, 0];
         }
     };
     Tap.prototype.draw = function (speed) {
@@ -481,20 +540,17 @@ var ExTap = /** @class */ (function (_super) {
     ExTap.prototype.judge = function (current) {
         var gap = current - this.time;
         if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0];
+            return [Judgement.Miss, 0, 1];
         }
         else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0];
+            return [Judgement.Waiting, 0, 1];
         }
         else {
-            if (auto && Math.abs(gap) < duration) {
-                return [Judgement.Perfect, 1500];
-            }
-            else if (!auto) {
-                return [Judgement.Perfect, 1500];
+            if ((auto && Math.abs(gap) < duration) || !auto) {
+                return [Judgement.Perfect, 1500, 1];
             }
             else {
-                return [Judgement.Waiting, 0];
+                return [Judgement.Waiting, 0, 1];
             }
         }
     };
@@ -624,10 +680,8 @@ function Main() {
                                 var key = event.key.toUpperCase();
                                 var ki = key_bind.indexOf(key);
                                 if (ki != -1) {
-                                    HITBOX[ki].style.background = HITDOWN;
-                                    TRACKS[ki].style.background = TRACKDOWN;
-                                    score += game.chart.tracks[ki].pop();
-                                    SCORE.innerText = "SCORE: ".concat(score);
+                                    score += game.hit(ki);
+                                    pressOn(ki);
                                 }
                             }
                         });
@@ -636,8 +690,7 @@ function Main() {
                                 var key = event.key.toUpperCase();
                                 var ki = key_bind.indexOf(key);
                                 if (ki != -1) {
-                                    HITBOX[ki].style.background = HITUP;
-                                    TRACKS[ki].style.background = TRACKUP;
+                                    pressOut(ki);
                                 }
                             }
                         });
