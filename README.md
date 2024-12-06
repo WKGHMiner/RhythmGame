@@ -10,8 +10,11 @@ This Gameview is devided into two parts: Effect and Game.
 ## Game
 
 Basically, press 'D', 'F', 'J' and 'K' (as default configuration in "setting.json") to hit the notes.
+Press "Escape" to pause or resume the game.
 
-## Effect(On Development)
+---
+
+## Effect
 
 The effect part will basically contains an audio visualisation.
 
