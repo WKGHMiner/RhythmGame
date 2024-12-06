@@ -1,5 +1,9 @@
+import { Chart, Track, Judgement } from "./play.js";
+import { Effect, AudioQueue } from "./effect.js";
+
+
 /** HTML element set of Tracks. */
-const TRACKS = document.querySelectorAll(".Track") as NodeListOf<HTMLDivElement>;
+export const TRACKS = document.querySelectorAll(".Track") as NodeListOf<HTMLDivElement>;
 /** HTML element set of Hitboxes. */
 const HITBOX = document.querySelectorAll(".HitBox") as NodeListOf<HTMLDivElement>;
 
@@ -30,17 +34,17 @@ const HITDOWN = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0
 const HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
 
 // Setting parameters.
-var setting: Object;
-var key_bind: string[];
-var render_duration: number = 500;
-var duration: number = 40;
-var auto: boolean = false;
-var offset: number = 0;
-var mvolume: number = 0.4;
-var svolume: number = 0.5;
+export var setting: Object;
+export var key_bind: string[];
+export var render_duration: number = 500;
+export var duration: number = 40;
+export var offset: number = 0;
+export var mvolume: number = 0.4;
+export var svolume: number = 0.5;
+export var auto: boolean = false;
 
 // Global time counter.
-var global_time: number = 0;
+export var global_time: number = 0;
 
 // Statistic variables.
 var score: number = 0;
@@ -53,6 +57,7 @@ var current_hit: number = 0;
 
 // Status signal.
 var isReady: boolean = false;
+var isVisualizeAllowed: boolean = true;
 
 // Control signal.
 var isPaused: boolean = false;
@@ -71,14 +76,14 @@ async function readSetting() {
 }
 
 
-async function readChart(name: string): Promise<Object> {
-    var obj: Object = await (await fetch("./chart/" + name + ".json")).json();
+async function readChart(path: string): Promise<Object> {
+    var obj: Object = await (await fetch(path)).json();
     return obj;
 }
 
 
 function getReady(game: Game) {
-    document.addEventListener("keydown", event => {
+    document.addEventListener("keydown", async event => {
         if (!isReady) {
             isReady = true;
 
@@ -87,7 +92,6 @@ function getReady(game: Game) {
             mc.removeChild(prompt);
             prompt.remove();
             
-            game.loadContext();
             game.start();
 
             document.addEventListener("keydown", event => {
@@ -101,7 +105,7 @@ function getReady(game: Game) {
 
 
 /** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
-function showJudgement(judgement: Judgement) {
+export function showJudgement(judgement: Judgement) {
     switch (judgement) {
         case Judgement.Waiting:
             JUDGEMENT.innerText = "";
@@ -138,7 +142,7 @@ function showJudgement(judgement: Judgement) {
 }
 
 
-function updateHit(judgement: Judgement) {
+export function updateHit(judgement: Judgement) {
     switch (judgement) {
         case Judgement.Waiting:
             return;
@@ -179,6 +183,7 @@ function pressOut(index: number) {
 class Game {
     speed: number;
     chart: Chart;
+    sounds: AudioQueue;
     effect: Effect;
     start_time: number;
     offset: number;
@@ -186,25 +191,50 @@ class Game {
     context: AudioContext;
 
     constructor(obj: Object, speed: number) {
-        this.chart = new Chart(obj);
+        this.sounds = new AudioQueue();
+        this.chart = new Chart(obj, this.sounds);
         this.speed = speed;
         this.offset = this.chart.offset + offset;
     }
-    
-    
-    loadContext() {
-        this.music = this.chart.loadMusic();
-        this.music.volume = mvolume;
-        this.context = new AudioContext();
 
-        this.loadEffect();
+
+    get isSpecial(): boolean {
+        return this.chart.special;
+    }
+    
+    
+    async loadContext() {
+        this.music = this.chart.loadMusic();
+
+        if (this.isSpecial) {
+            this.context = new window.AudioContext();
+            this.music.volume = 0;
+        } else {
+            this.context = new AudioContext();
+            this.music.volume = mvolume;
+        }
+
+        await this.loadEffect();
 
         this.music.addEventListener("ended", event => { isEnded = true })
     }
 
 
-    loadEffect() {
-        this.effect = new Effect(this.music, this.context);
+    async loadEffect() {
+        if (this.isSpecial) {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    audio: true,
+                    video: true,
+                    selfBrowserSurface: "include"
+                });
+                this.effect = new Effect(stream, this.context, this.isSpecial);
+            } catch (err) {
+                isVisualizeAllowed = false;
+            }
+        } else {
+            this.effect = new Effect(this.music, this.context, this.isSpecial);
+        }
     }
 
 
@@ -223,6 +253,9 @@ class Game {
             this.context.resume();
             this.music.play();
             requestAnimationFrame(_ => this.drawAll());
+        } else if (isEnded) {
+            // TODO: Unimplemented.
+            return;
         } else {
             PAUSED.style.visibility = "visible";
             this.music.pause();
@@ -249,7 +282,9 @@ class Game {
             this.drawSingleTrack(index);
         }
 
-        requestAnimationFrame(_ => this.effect.draw());
+        if (isVisualizeAllowed) {
+            requestAnimationFrame(_ => this.effect.draw());
+        }
     
         if (isEnded) {
             JUDGEMENT.innerText = "";
@@ -264,6 +299,10 @@ class Game {
 
 
     drawSingleTrack(index: number) {
+        if (this.isSpecial) {
+            this.sounds.pop(this.context);
+        }
+
         var track: Track = this.chart.tracks[index];
         for (var i = 0; i < track.length; i ++) {
             var note = track.notes[i];
@@ -273,13 +312,13 @@ class Game {
                 if (note.isWaiting()) {
                     break;
                 } else {
-                    track.pop(this.context);
+                    track.pop(this.context, this.isSpecial);
                     i -= 1;
                 }
             }
 
             if (auto && note.isPerfect()) {
-                score += track.pop(this.context);
+                score += track.pop(this.context, this.isSpecial);
                 pressOn(index);
                 i -= 1;
 
@@ -290,463 +329,7 @@ class Game {
 
 
     hit(index: number): number {
-        return this.chart.tracks[index].pop(this.context);
-    }
-}
-
-
-/** Chart class:
- * 
- *  Holding chart infomations.
- */
-class Chart {
-    name: string;
-    music_path: string;
-    composer: string;
-    illustration: string;
-    tracks: Track[];
-    track: number;
-    offset: number;
-
-    constructor(object: Object) {
-        this.name = object["name"];
-        this.music_path = object["music"];
-        this.composer = object["composer"];
-        this.illustration = object["illustration"];
-        this.track = object["track"];
-        this.tracks = [];
-        this.offset = object["offset"];
-
-        for (var _ = 0; _ < this.track; _ ++) {
-            this.tracks.push(new Track());
-        }
-
-        document.title = `${this.composer} - ${this.name}`;
-
-        this.loadChart(object);
-    }
-
-
-    loadMusic(): HTMLAudioElement {
-        var audio = document.createElement("audio");
-        audio.src = this.music_path;
-
-        return audio;
-    }
-
-
-    loadChart(object: Object) {
-        var notes: Object[] = object["notes"];
-        notes.sort((a, b) => a["time"] - b["time"]);
-
-        for (var index = 0; index < notes.length; index ++) {
-            var obj = notes[index];
-            var note: Note;
-
-            switch (obj["type"]) {
-                case 0:
-                    note = new Tap(obj, index);
-                    break;
-
-                case 1:
-                    note = new ExTap(obj, index);
-                    break;
-
-                default:
-                    note = new Note(obj, index);
-                    break;
-            }
-
-            this.tracks[note.track].push(note);
-        }
-    }
-}
-
-
-/** Track class:
- * 
- *  Holds notes and yields score.
- */
-class Track {
-    /** This array is actually a queue. */
-    notes: Note[];
-    length: number;
-
-    constructor() {
-        this.notes = [];
-        this.length = 0;
-    }
-
-
-    push(note: Note) {
-        this.notes.push(note);
-        this.length += 1;
-    }
-
-
-    /**
-     * Trys to pop out notes based on `global_time`,
-     * and return the score based on judgement.
-     */
-    pop(context: AudioContext): number {
-        if (this.length == 0) {
-            return 0;
-        }
-        
-        var res = this.notes[0].judge(global_time);
-        switch (res[0]) {
-            case Judgement.Waiting:
-                return 0;
-
-            case Judgement.Miss:
-                miss_count += 1;
-                break;
-            
-            case Judgement.Perfect:
-                perfect_count += 1;
-                break;
-
-            case Judgement.Good:
-                good_count += 1;
-                break;
-
-            case Judgement.Bad:
-                bad_count += 1;
-                break;
-        }
-
-        if (res[0] != Judgement.Miss) {
-            this.hitSound(context, res[2]);
-        }
-
-        showJudgement(res[0]);
-        updateHit(res[0]);
-        this.deleteHead();
-        return res[1];
-    }
-
-
-    private deleteHead() {
-        var note = this.notes.shift();
-        var node = document.getElementById("Note" + note.id);
-
-        if (node) {
-            TRACKS[note.track].removeChild(node);
-            node.remove();
-        }
-
-        this.length -= 1;
-    }
-
-
-    async hitSound(context: AudioContext, type: number) {
-        var path: string = Note.matchType(type);
-        var audio = await (await fetch(path)).arrayBuffer();
-        var buffer = await context.decodeAudioData(audio);
-
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-
-        const gain = context.createGain();
-        source.connect(gain);
-        gain.connect(context.destination);
-
-        gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
-        source.start(0);
-
-        source.onended = () => {
-            source.disconnect(context.destination);
-            gain.disconnect(context.destination);
-        }
-    }
-}
-
-
-/** Judgement enum:
- * 
- *  Representing player's performance.
- */
-enum Judgement { Waiting, Perfect, Good, Bad, Miss }
-
-
-interface Base {
-    /** Returns the judgement of note. */
-    judge(current: number): [Judgement, number, number];
-
-    /**
-     * Draws this note on the screen,
-     * and returns whether this note is missed.
-     */
-    draw(speed: number): boolean;
-
-    isPerfect(): boolean;
-
-    isMiss(): boolean;
-
-    isWaiting(): boolean;
-}
-
-
-/** Note class:
- * 
- *  Note base class, any other type of note can extend this class.
- */
-class Note implements Base {
-    time: number;
-    track: number;
-    type: number;
-    id: number;
-
-    constructor (object: Object, id: number) {
-        this.time = object["time"];
-        this.track = object["track"];
-        this.type = object["type"];
-        this.id = id;
-    }
-
-
-    judge(current: number): [Judgement, number, number] {
-        return [Judgement.Miss, 0, 0];
-    }
-
-
-    draw(speed: number): boolean {
-        return true;
-    }
-
-
-    isPerfect(): boolean {
-        return this.judge(global_time)[0] == Judgement.Perfect;
-    }
-
-
-    isMiss(): boolean {
-        return this.judge(global_time)[0] == Judgement.Miss;
-    }
-
-
-    isWaiting(): boolean {
-        return this.judge(global_time)[0] == Judgement.Waiting;
-    }
-
-
-    static matchType(type: number): string {
-        var path = "../resource/sound/";
-        switch (type) {
-            case 1:
-                return path + "extap.mp3";
-
-            default:
-                return path + "tap.mp3";
-        }
-    }
-}
-
-
-class Tap extends Note {
-    constructor(object: Object, id: number) {
-        super(object, id);
-    }
-
-
-    judge(current: number): [Judgement, number, number] {
-        var gap = current - this.time;
-
-        if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0, 0];
-        } else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0, 0];
-        }
-
-        gap = Math.abs(gap);
-
-        if (gap <= duration) {
-            return [Judgement.Perfect, 1500, 0];
-        } else if (gap <= duration * 2) {
-            return [Judgement.Good, 1000, 0];
-        } else {
-            return [Judgement.Bad, 500, 0];
-        }
-    }
-
-
-    draw(speed: number): boolean {
-        var rd = render_duration / speed;
-        var gap: number = this.time - global_time;
-
-        var elem = document.getElementById("Note" + this.id) as HTMLDivElement | null;
-        if (gap > render_duration || this.isMiss()) {
-            if (elem) {
-                TRACKS[this.track].removeChild(elem);
-                elem.remove();
-            }
-            
-            return true;
-        } else {
-            if (!elem) {
-                elem = document.createElement("div");
-                elem.className = "Tap";
-                elem.id = `Note${this.id}`;
-                TRACKS[this.track].appendChild(elem);
-                elem.style.top = "0%";
-            }
-            elem.style.top = `${Math.min((1 - gap / rd) * 100, 100)}%`
-            
-            return false;
-        }
-    }
-}
-
-
-class ExTap extends Tap {
-    judge(current: number): [Judgement, number, number] {
-        var gap = current - this.time;
-
-        if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0, 1];
-        } else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0, 1];
-        } else {
-            if ((auto && Math.abs(gap) < duration) || !auto) {
-                return [Judgement.Perfect, 1500, 1];
-            } else {
-                return [Judgement.Waiting, 0, 1];
-            }
-        }
-    }
-
-
-    draw(speed: number): boolean {
-        var res = super.draw(speed);
-        var elem = document.getElementById("Note" + this.id) as HTMLDivElement | null;
-
-        if (elem) {
-            elem.className = "ExTap";
-        }
-
-        return res;
-    }
-}
-
-
-class Effect {
-    analyser: AnalyserNode;
-    source: MediaElementAudioSourceNode
-    array: Uint8Array;
-    canvas: HTMLCanvasElement;
-    cvsCtx: CanvasRenderingContext2D;
-    style: number;
-    styleBack: boolean;
-    salt: number;
-    radial: number;
-    theta: number;
-
-    constructor(audio: HTMLAudioElement, ctx: AudioContext) {
-        this.source = ctx.createMediaElementSource(audio);
-        this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 256;
-        
-        this.source.connect(this.analyser);
-        this.analyser.connect(ctx.destination);
-
-        this.array = new Uint8Array(this.analyser.frequencyBinCount);
-        
-        this.canvas = document.querySelector(".Effect") as HTMLCanvasElement;
-        this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
-        this.canvas.width = this.canvas.clientWidth * window.devicePixelRatio;
-        this.cvsCtx = this.canvas.getContext("2d");
-
-        this.style = 0.4;
-        this.styleBack = false;
-        this.salt = Math.random();
-        
-        var illustration = document.querySelector(".Illustration");
-        this.radial = illustration.clientHeight * 0.75;
-        this.theta = 0;
-    }
-
-
-    set fftSize(size: number) {
-        this.analyser.fftSize = size;
-    }
-
-
-    get frequencyBinCount(): number {
-        return this.analyser.frequencyBinCount / 4 * 3;
-    }
-
-
-    clear() {
-        this.cvsCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-
-
-    changeStyle() {
-        if (this.styleBack) {
-            this.style -= 0.005;
-        } else {
-            this.style += 0.005;
-        }
-    
-        if (this.style >= 0.75) {
-            this.style = 0.75;
-            this.styleBack = true;
-        } else if (this.style <= 0.25) {
-            this.style = 0.25;
-            this.styleBack = false;
-        }
-    }
-
-
-    getColor(base: number): Array<number> {
-        var color = [base * this.style, base / this.style, base];
-        
-        if (this.salt <= 0.33) {
-            
-        } else if (this.salt <= 0.67) {
-            color.push(color.shift());
-        } else {
-            color.unshift(color.pop());
-        }
-
-        return color;
-    }
-
-
-    getTheta(): number {
-        var current = this.theta;
-        this.theta += 0.05;
-        this.theta %= this.frequencyBinCount;
-        return current;
-    }
-
-
-    draw() {
-        this.changeStyle();
-        var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
-        var width = this.canvas.width / 2;
-        var height = this.canvas.height;
-        
-        this.clear();
-        
-        var angle = Math.PI * 2 / this.frequencyBinCount;
-        this.cvsCtx.save();
-        this.cvsCtx.translate(width, height / 2);
-        this.cvsCtx.rotate(angle * this.getTheta());
-
-        this.analyser.getByteFrequencyData(this.array);
-        for (var index = this.array.length / 4; index < this.array.length; index ++) {
-            var frequency = this.array[index];
-            var rgb = this.getColor(frequency);
-
-            this.cvsCtx.rotate(angle);
-
-            this.cvsCtx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.8)`;
-            this.cvsCtx.fillRect(0, this.radial, bar_width, frequency);
-        }
-
-        this.cvsCtx.translate(-width, -height / 2);
-        this.cvsCtx.restore();
+        return this.chart.tracks[index].pop(this.context, this.isSpecial);
     }
 }
 
@@ -755,12 +338,13 @@ class Effect {
  * 
  *  Integrates and choronously calls async functions, ensuring workflow.
  */
-async function Main() {
+async function Main(path: string) {
     await readSetting();
-    var obj = await readChart("Nhato_Override");
+    var obj = await readChart(path);
     var game = new Game(obj, 10);
 
     game.loadBg();
+    await game.loadContext();
 
     if (!auto) {
         document.addEventListener("keydown", (event) => {
@@ -791,4 +375,4 @@ async function Main() {
 }
 
 
-Main()
+Main("./chart/Override/Nhato_Override_Modified.json")

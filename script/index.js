@@ -1,18 +1,3 @@
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = function (d, b) {
-        extendStatics = Object.setPrototypeOf ||
-            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
-        return extendStatics(d, b);
-    };
-    return function (d, b) {
-        if (typeof b !== "function" && b !== null)
-            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -22,69 +7,44 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
-    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
-    function verb(n) { return function (v) { return step([n, v]); }; }
-    function step(op) {
-        if (f) throw new TypeError("Generator is already executing.");
-        while (g && (g = 0, op[0] && (_ = 0)), _) try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [op[0] & 2, t.value];
-            switch (op[0]) {
-                case 0: case 1: t = op; break;
-                case 4: _.label++; return { value: op[1], done: false };
-                case 5: _.label++; y = op[1]; op = [0]; continue;
-                case 7: op = _.ops.pop(); _.trys.pop(); continue;
-                default:
-                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
-                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
-                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
-                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
-                    if (t[2]) _.ops.pop();
-                    _.trys.pop(); continue;
-            }
-            op = body.call(thisArg, _);
-        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
-        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
-    }
-};
+import { Chart, Judgement } from "./play.js";
+import { Effect, AudioQueue } from "./effect.js";
 /** HTML element set of Tracks. */
-var TRACKS = document.querySelectorAll(".Track");
+export const TRACKS = document.querySelectorAll(".Track");
 /** HTML element set of Hitboxes. */
-var HITBOX = document.querySelectorAll(".HitBox");
+const HITBOX = document.querySelectorAll(".HitBox");
 /** HTML element of Judgement display. */
-var JUDGEMENT = document.querySelector(".Judgement");
+const JUDGEMENT = document.querySelector(".Judgement");
 /** HTML element of Score. */
-var SCORE = document.querySelector(".Score");
-var PAUSED = document.querySelector(".Paused");
+const SCORE = document.querySelector(".Score");
+const PAUSED = document.querySelector(".Paused");
 // Counter elements.
-var PERFECT_COUNT = document.querySelector(".PerfectCount");
-var GOOD_COUNT = document.querySelector(".GoodCount");
-var BAD_COUNT = document.querySelector(".BadCount");
-var MISS_COUNT = document.querySelector(".MissCount");
-var HIT_COUNT = document.querySelector(".HitCount");
+const PERFECT_COUNT = document.querySelector(".PerfectCount");
+const GOOD_COUNT = document.querySelector(".GoodCount");
+const BAD_COUNT = document.querySelector(".BadCount");
+const MISS_COUNT = document.querySelector(".MissCount");
+const HIT_COUNT = document.querySelector(".HitCount");
 // Color literals.
-var PERFECT_COLOR = "rgba(245, 241, 0, 0.6)";
-var GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
-var BAD_COLOR = "rgba(255, 47, 0, 0.6)";
-var MISS_COLOR = "rgba(255, 255, 255, 0.6)";
+const PERFECT_COLOR = "rgba(245, 241, 0, 0.6)";
+const GOOD_COLOR = "rgba(0, 255, 30, 0.6)";
+const BAD_COLOR = "rgba(255, 47, 0, 0.6)";
+const MISS_COLOR = "rgba(255, 255, 255, 0.6)";
 // Key event style literals.
-var TRACKDOWN = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
-var TRACKUP = "none";
-var HITDOWN = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
-var HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
+const TRACKDOWN = "linear-gradient(to top, rgba(155, 155, 155, 0.3), rgba(110, 110, 110, 0.1))";
+const TRACKUP = "none";
+const HITDOWN = "radial-gradient(rgba(200, 200, 200, 0.8), rgba(170, 170, 170, 0.8))";
+const HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8))";
 // Setting parameters.
-var setting;
-var key_bind;
-var render_duration = 500;
-var duration = 40;
-var auto = false;
-var offset = 0;
-var mvolume = 0.8;
-var svolume = 0.5;
+export var setting;
+export var key_bind;
+export var render_duration = 500;
+export var duration = 40;
+export var offset = 0;
+export var mvolume = 0.4;
+export var svolume = 0.5;
+export var auto = false;
 // Global time counter.
-var global_time = 0;
+export var global_time = 0;
 // Statistic variables.
 var score = 0;
 var perfect_count = 0;
@@ -95,63 +55,47 @@ var max_hit = 0;
 var current_hit = 0;
 // Status signal.
 var isReady = false;
+var isVisualizeAllowed = true;
 // Control signal.
 var isPaused = false;
 var isEnded = false;
 /** Read `setting.json` to update settings. */
 function readSetting() {
-    return __awaiter(this, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0: return [4 /*yield*/, fetch("./setting.json")];
-                case 1: return [4 /*yield*/, (_a.sent()).json()];
-                case 2:
-                    setting = _a.sent();
-                    key_bind = setting["key-bind"];
-                    render_duration = setting["render-duration"];
-                    duration = setting["duration"];
-                    auto = setting["auto"];
-                    mvolume = setting["music-volume"];
-                    svolume = setting["sound-volume"];
-                    return [2 /*return*/];
-            }
-        });
+    return __awaiter(this, void 0, void 0, function* () {
+        setting = yield (yield fetch("./setting.json")).json();
+        key_bind = setting["key-bind"];
+        render_duration = setting["render-duration"];
+        duration = setting["duration"];
+        auto = setting["auto"];
+        mvolume = setting["music-volume"];
+        svolume = setting["sound-volume"];
     });
 }
-function readChart(name) {
-    return __awaiter(this, void 0, void 0, function () {
-        var obj;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0: return [4 /*yield*/, fetch("./chart/" + name + ".json")];
-                case 1: return [4 /*yield*/, (_a.sent()).json()];
-                case 2:
-                    obj = _a.sent();
-                    return [2 /*return*/, obj];
-            }
-        });
+function readChart(path) {
+    return __awaiter(this, void 0, void 0, function* () {
+        var obj = yield (yield fetch(path)).json();
+        return obj;
     });
 }
 function getReady(game) {
-    document.addEventListener("keydown", function (event) {
+    document.addEventListener("keydown", (event) => __awaiter(this, void 0, void 0, function* () {
         if (!isReady) {
             isReady = true;
             var prompt = document.querySelector(".Prompt");
             var mc = document.querySelector(".MainContainer");
             mc.removeChild(prompt);
             prompt.remove();
-            game.loadContext();
             game.start();
-            document.addEventListener("keydown", function (event) {
+            document.addEventListener("keydown", event => {
                 if (event.key == "Escape") {
                     game.pause();
                 }
             });
         }
-    });
+    }));
 }
 /** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
-function showJudgement(judgement) {
+export function showJudgement(judgement) {
     switch (judgement) {
         case Judgement.Waiting:
             JUDGEMENT.innerText = "";
@@ -159,29 +103,29 @@ function showJudgement(judgement) {
         case Judgement.Perfect:
             JUDGEMENT.innerText = "Perfect";
             JUDGEMENT.style.color = PERFECT_COLOR;
-            PERFECT_COUNT.innerText = "".concat(perfect_count);
+            PERFECT_COUNT.innerText = `${perfect_count}`;
             break;
         case Judgement.Good:
             JUDGEMENT.innerText = "Good";
             JUDGEMENT.style.color = GOOD_COLOR;
-            GOOD_COUNT.innerText = "".concat(good_count);
+            GOOD_COUNT.innerText = `${good_count}`;
             break;
         case Judgement.Bad:
             JUDGEMENT.innerText = "Bad";
             JUDGEMENT.style.color = BAD_COLOR;
-            BAD_COUNT.innerText = "".concat(bad_count);
+            BAD_COUNT.innerText = `${bad_count}`;
             break;
         case Judgement.Miss:
             JUDGEMENT.innerText = "Miss";
             JUDGEMENT.style.color = MISS_COLOR;
-            MISS_COUNT.innerText = "".concat(miss_count);
+            MISS_COUNT.innerText = `${miss_count}`;
             break;
     }
     void JUDGEMENT.offsetWidth;
     JUDGEMENT.classList.add("zoomed");
-    setTimeout(function () { JUDGEMENT.classList.remove("zoomed"); }, 125);
+    setTimeout(() => { JUDGEMENT.classList.remove("zoomed"); }, 125);
 }
-function updateHit(judgement) {
+export function updateHit(judgement) {
     switch (judgement) {
         case Judgement.Waiting:
             return;
@@ -196,7 +140,7 @@ function updateHit(judgement) {
             break;
     }
     if (current_hit >= 3) {
-        HIT_COUNT.innerText = "".concat(current_hit);
+        HIT_COUNT.innerText = `${current_hit}`;
     }
     else {
         HIT_COUNT.innerText = "";
@@ -205,41 +149,73 @@ function updateHit(judgement) {
 function pressOn(index) {
     HITBOX[index].style.background = HITDOWN;
     TRACKS[index].style.background = TRACKDOWN;
-    SCORE.innerText = "SCORE: ".concat(score);
+    SCORE.innerText = `SCORE: ${score}`;
 }
 function pressOut(index) {
     HITBOX[index].style.background = HITUP;
     TRACKS[index].style.background = TRACKUP;
 }
-var Game = /** @class */ (function () {
-    function Game(obj, speed) {
-        this.chart = new Chart(obj);
+class Game {
+    constructor(obj, speed) {
+        this.sounds = new AudioQueue();
+        this.chart = new Chart(obj, this.sounds);
         this.speed = speed;
         this.offset = this.chart.offset + offset;
     }
-    Game.prototype.loadContext = function () {
-        this.music = this.chart.loadMusic();
-        this.music.volume = mvolume;
-        this.context = new AudioContext();
-        this.loadEffect();
-        this.music.addEventListener("ended", function (event) { isEnded = true; });
-    };
-    Game.prototype.loadEffect = function () {
-        this.effect = new Effect(this.music, this.context);
-    };
-    Game.prototype.loadBg = function () {
+    get isSpecial() {
+        return this.chart.special;
+    }
+    loadContext() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.music = this.chart.loadMusic();
+            if (this.isSpecial) {
+                this.context = new window.AudioContext();
+                this.music.volume = 0;
+            }
+            else {
+                this.context = new AudioContext();
+                this.music.volume = mvolume;
+            }
+            yield this.loadEffect();
+            this.music.addEventListener("ended", event => { isEnded = true; });
+        });
+    }
+    loadEffect() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.isSpecial) {
+                try {
+                    const stream = yield navigator.mediaDevices.getDisplayMedia({
+                        audio: true,
+                        video: true,
+                        selfBrowserSurface: "include"
+                    });
+                    this.effect = new Effect(stream, this.context, this.isSpecial);
+                }
+                catch (err) {
+                    isVisualizeAllowed = false;
+                }
+            }
+            else {
+                this.effect = new Effect(this.music, this.context, this.isSpecial);
+            }
+        });
+    }
+    loadBg() {
         var illustration = document.querySelector(".Illustration");
         illustration.src = this.chart.illustration;
         var bg = document.querySelector(".Background");
-        bg.style.backgroundImage = "url(".concat(this.chart.illustration, ")");
-    };
-    Game.prototype.pause = function () {
-        var _this = this;
+        bg.style.backgroundImage = `url(${this.chart.illustration})`;
+    }
+    pause() {
         if (!isEnded && isPaused) {
             PAUSED.style.visibility = "hidden";
             this.context.resume();
             this.music.play();
-            requestAnimationFrame(function (_) { return _this.drawAll(); });
+            requestAnimationFrame(_ => this.drawAll());
+        }
+        else if (isEnded) {
+            // TODO: Unimplemented.
+            return;
         }
         else {
             PAUSED.style.visibility = "visible";
@@ -247,34 +223,37 @@ var Game = /** @class */ (function () {
             this.context.suspend();
         }
         isPaused = !isPaused;
-    };
-    Game.prototype.start = function () {
-        var _this = this;
+    }
+    start() {
         this.start_time = this.context.currentTime;
-        this.music.play().then(function () {
+        this.music.play().then(() => {
             // This yields time tick., which is previously used as global time.
-            requestAnimationFrame(function (_) { return _this.drawAll(); });
+            requestAnimationFrame(_ => this.drawAll());
         });
-    };
-    Game.prototype.drawAll = function () {
-        var _this = this;
+    }
+    drawAll() {
         global_time = Math.fround((this.context.currentTime - this.start_time) * 1000) + this.offset;
-        for (var index = 0; index < this.chart.track; index++) {
+        for (let index = 0; index < this.chart.track; index++) {
             this.drawSingleTrack(index);
         }
-        requestAnimationFrame(function (_) { return _this.effect.draw(); });
+        if (isVisualizeAllowed) {
+            requestAnimationFrame(_ => this.effect.draw());
+        }
         if (isEnded) {
             JUDGEMENT.innerText = "";
-            HIT_COUNT.innerText = "MAX HIT: ".concat(max_hit);
+            HIT_COUNT.innerText = `MAX HIT: ${max_hit}`;
             this.effect.clear();
         }
         else {
             if (!isPaused) {
-                requestAnimationFrame(function (_) { return _this.drawAll(); });
+                requestAnimationFrame(_ => this.drawAll());
             }
         }
-    };
-    Game.prototype.drawSingleTrack = function (index) {
+    }
+    drawSingleTrack(index) {
+        if (this.isSpecial) {
+            this.sounds.pop(this.context);
+        }
         var track = this.chart.tracks[index];
         for (var i = 0; i < track.length; i++) {
             var note = track.notes[i];
@@ -284,421 +263,55 @@ var Game = /** @class */ (function () {
                     break;
                 }
                 else {
-                    track.pop(this.context);
+                    track.pop(this.context, this.isSpecial);
                     i -= 1;
                 }
             }
             if (auto && note.isPerfect()) {
-                score += track.pop(this.context);
+                score += track.pop(this.context, this.isSpecial);
                 pressOn(index);
                 i -= 1;
-                setTimeout(function (_) { return pressOut(index); }, duration);
+                setTimeout(_ => pressOut(index), duration);
             }
         }
-    };
-    Game.prototype.hit = function (index) {
-        return this.chart.tracks[index].pop(this.context);
-    };
-    return Game;
-}());
-/** Chart class:
- *
- *  Holding chart infomations.
- */
-var Chart = /** @class */ (function () {
-    function Chart(object) {
-        this.name = object["name"];
-        this.music_path = object["music"];
-        this.composer = object["composer"];
-        this.illustration = object["illustration"];
-        this.track = object["track"];
-        this.tracks = [];
-        this.offset = object["offset"];
-        for (var _ = 0; _ < this.track; _++) {
-            this.tracks.push(new Track());
-        }
-        document.title = "".concat(this.composer, " - ").concat(this.name);
-        this.loadChart(object);
     }
-    Chart.prototype.loadMusic = function () {
-        var audio = document.createElement("audio");
-        audio.src = this.music_path;
-        return audio;
-    };
-    Chart.prototype.loadChart = function (object) {
-        var notes = object["notes"];
-        notes.sort(function (a, b) { return a["time"] - b["time"]; });
-        for (var index = 0; index < notes.length; index++) {
-            var obj = notes[index];
-            var note;
-            switch (obj["type"]) {
-                case 0:
-                    note = new Tap(obj, index);
-                    break;
-                case 1:
-                    note = new ExTap(obj, index);
-                    break;
-                default:
-                    note = new Note(obj, index);
-                    break;
-            }
-            this.tracks[note.track].push(note);
-        }
-    };
-    return Chart;
-}());
-/** Track class:
- *
- *  Holds notes and yields score.
- */
-var Track = /** @class */ (function () {
-    function Track() {
-        this.notes = [];
-        this.length = 0;
+    hit(index) {
+        return this.chart.tracks[index].pop(this.context, this.isSpecial);
     }
-    Track.prototype.push = function (note) {
-        this.notes.push(note);
-        this.length += 1;
-    };
-    /**
-     * Trys to pop out notes based on `global_time`,
-     * and return the score based on judgement.
-     */
-    Track.prototype.pop = function (context) {
-        if (this.length == 0) {
-            return 0;
-        }
-        var res = this.notes[0].judge(global_time);
-        switch (res[0]) {
-            case Judgement.Waiting:
-                return 0;
-            case Judgement.Miss:
-                miss_count += 1;
-                break;
-            case Judgement.Perfect:
-                perfect_count += 1;
-                break;
-            case Judgement.Good:
-                good_count += 1;
-                break;
-            case Judgement.Bad:
-                bad_count += 1;
-                break;
-        }
-        if (res[0] != Judgement.Miss) {
-            this.hitSound(context, res[2]);
-        }
-        showJudgement(res[0]);
-        updateHit(res[0]);
-        this.deleteHead();
-        return res[1];
-    };
-    Track.prototype.deleteHead = function () {
-        var note = this.notes.shift();
-        var node = document.getElementById("Note" + note.id);
-        if (node) {
-            TRACKS[note.track].removeChild(node);
-            node.remove();
-        }
-        this.length -= 1;
-    };
-    Track.prototype.hitSound = function (context, type) {
-        return __awaiter(this, void 0, void 0, function () {
-            var path, audio, buffer, source, gain;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        path = Note.matchType(type);
-                        return [4 /*yield*/, fetch(path)];
-                    case 1: return [4 /*yield*/, (_a.sent()).arrayBuffer()];
-                    case 2:
-                        audio = _a.sent();
-                        return [4 /*yield*/, context.decodeAudioData(audio)];
-                    case 3:
-                        buffer = _a.sent();
-                        source = context.createBufferSource();
-                        source.buffer = buffer;
-                        gain = context.createGain();
-                        source.connect(gain);
-                        gain.connect(context.destination);
-                        gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
-                        source.start(0);
-                        source.onended = function () {
-                            source.disconnect(context.destination);
-                            gain.disconnect(context.destination);
-                        };
-                        return [2 /*return*/];
-                }
-            });
-        });
-    };
-    return Track;
-}());
-/** Judgement enum:
- *
- *  Representing player's performance.
- */
-var Judgement;
-(function (Judgement) {
-    Judgement[Judgement["Waiting"] = 0] = "Waiting";
-    Judgement[Judgement["Perfect"] = 1] = "Perfect";
-    Judgement[Judgement["Good"] = 2] = "Good";
-    Judgement[Judgement["Bad"] = 3] = "Bad";
-    Judgement[Judgement["Miss"] = 4] = "Miss";
-})(Judgement || (Judgement = {}));
-/** Note class:
- *
- *  Note base class, any other type of note can extend this class.
- */
-var Note = /** @class */ (function () {
-    function Note(object, id) {
-        this.time = object["time"];
-        this.track = object["track"];
-        this.type = object["type"];
-        this.id = id;
-    }
-    Note.prototype.judge = function (current) {
-        return [Judgement.Miss, 0, 0];
-    };
-    Note.prototype.draw = function (speed) {
-        return true;
-    };
-    Note.prototype.isPerfect = function () {
-        return this.judge(global_time)[0] == Judgement.Perfect;
-    };
-    Note.prototype.isMiss = function () {
-        return this.judge(global_time)[0] == Judgement.Miss;
-    };
-    Note.prototype.isWaiting = function () {
-        return this.judge(global_time)[0] == Judgement.Waiting;
-    };
-    Note.matchType = function (type) {
-        var path = "../resource/sound/";
-        switch (type) {
-            case 1:
-                return path + "extap.mp3";
-            default:
-                return path + "tap.mp3";
-        }
-    };
-    return Note;
-}());
-var Tap = /** @class */ (function (_super) {
-    __extends(Tap, _super);
-    function Tap(object, id) {
-        return _super.call(this, object, id) || this;
-    }
-    Tap.prototype.judge = function (current) {
-        var gap = current - this.time;
-        if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0, 0];
-        }
-        else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0, 0];
-        }
-        gap = Math.abs(gap);
-        if (gap <= duration) {
-            return [Judgement.Perfect, 1500, 0];
-        }
-        else if (gap <= duration * 2) {
-            return [Judgement.Good, 1000, 0];
-        }
-        else {
-            return [Judgement.Bad, 500, 0];
-        }
-    };
-    Tap.prototype.draw = function (speed) {
-        var rd = render_duration / speed;
-        var gap = this.time - global_time;
-        var elem = document.getElementById("Note" + this.id);
-        if (gap > render_duration || this.isMiss()) {
-            if (elem) {
-                TRACKS[this.track].removeChild(elem);
-                elem.remove();
-            }
-            return true;
-        }
-        else {
-            if (!elem) {
-                elem = document.createElement("div");
-                elem.className = "Tap";
-                elem.id = "Note".concat(this.id);
-                TRACKS[this.track].appendChild(elem);
-                elem.style.top = "0%";
-            }
-            elem.style.top = "".concat(Math.min((1 - gap / rd) * 100, 100), "%");
-            return false;
-        }
-    };
-    return Tap;
-}(Note));
-var ExTap = /** @class */ (function (_super) {
-    __extends(ExTap, _super);
-    function ExTap() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    ExTap.prototype.judge = function (current) {
-        var gap = current - this.time;
-        if (gap >= (duration * 3)) {
-            return [Judgement.Miss, 0, 1];
-        }
-        else if (gap <= -(duration * 2)) {
-            return [Judgement.Waiting, 0, 1];
-        }
-        else {
-            if ((auto && Math.abs(gap) < duration) || !auto) {
-                return [Judgement.Perfect, 1500, 1];
-            }
-            else {
-                return [Judgement.Waiting, 0, 1];
-            }
-        }
-    };
-    ExTap.prototype.draw = function (speed) {
-        var res = _super.prototype.draw.call(this, speed);
-        var elem = document.getElementById("Note" + this.id);
-        if (elem) {
-            elem.className = "ExTap";
-        }
-        return res;
-    };
-    return ExTap;
-}(Tap));
-var Effect = /** @class */ (function () {
-    function Effect(audio, ctx) {
-        this.source = ctx.createMediaElementSource(audio);
-        this.analyser = ctx.createAnalyser();
-        this.analyser.fftSize = 256;
-        this.source.connect(this.analyser);
-        this.analyser.connect(ctx.destination);
-        this.array = new Uint8Array(this.analyser.frequencyBinCount);
-        this.canvas = document.querySelector(".Effect");
-        this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
-        this.canvas.width = this.canvas.clientWidth * window.devicePixelRatio;
-        this.cvsCtx = this.canvas.getContext("2d");
-        this.style = 0.4;
-        this.styleBack = false;
-        this.salt = Math.random();
-        var illustration = document.querySelector(".Illustration");
-        this.radial = illustration.clientHeight * 0.75;
-        this.theta = 0;
-    }
-    Object.defineProperty(Effect.prototype, "fftSize", {
-        set: function (size) {
-            this.analyser.fftSize = size;
-        },
-        enumerable: false,
-        configurable: true
-    });
-    Object.defineProperty(Effect.prototype, "frequencyBinCount", {
-        get: function () {
-            return this.analyser.frequencyBinCount / 4 * 3;
-        },
-        enumerable: false,
-        configurable: true
-    });
-    Effect.prototype.clear = function () {
-        this.cvsCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    };
-    Effect.prototype.changeStyle = function () {
-        if (this.styleBack) {
-            this.style -= 0.005;
-        }
-        else {
-            this.style += 0.005;
-        }
-        if (this.style >= 0.75) {
-            this.style = 0.75;
-            this.styleBack = true;
-        }
-        else if (this.style <= 0.25) {
-            this.style = 0.25;
-            this.styleBack = false;
-        }
-    };
-    Effect.prototype.getColor = function (base) {
-        var color = [base * this.style, base / this.style, base];
-        if (this.salt <= 0.33) {
-        }
-        else if (this.salt <= 0.67) {
-            color.push(color.shift());
-        }
-        else {
-            color.unshift(color.pop());
-        }
-        return color;
-    };
-    Effect.prototype.getTheta = function () {
-        var current = this.theta;
-        this.theta += 0.05;
-        this.theta %= this.frequencyBinCount;
-        return current;
-    };
-    Effect.prototype.draw = function () {
-        this.changeStyle();
-        var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
-        var width = this.canvas.width / 2;
-        var height = this.canvas.height;
-        this.clear();
-        var angle = Math.PI * 2 / this.frequencyBinCount;
-        this.cvsCtx.save();
-        this.cvsCtx.translate(width, height / 2);
-        this.cvsCtx.rotate(angle * this.getTheta());
-        this.analyser.getByteFrequencyData(this.array);
-        for (var index = this.array.length / 4; index < this.array.length; index++) {
-            var frequency = this.array[index];
-            var rgb = this.getColor(frequency);
-            this.cvsCtx.rotate(angle);
-            this.cvsCtx.fillStyle = "rgba(".concat(rgb[0], ", ").concat(rgb[1], ", ").concat(rgb[2], ", 0.8)");
-            this.cvsCtx.fillRect(0, this.radial, bar_width, frequency);
-        }
-        this.cvsCtx.translate(-width, -height / 2);
-        this.cvsCtx.restore();
-    };
-    return Effect;
-}());
+}
 /** Main function
  *
  *  Integrates and choronously calls async functions, ensuring workflow.
  */
-function Main() {
-    return __awaiter(this, void 0, void 0, function () {
-        var obj, game;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0: return [4 /*yield*/, readSetting()];
-                case 1:
-                    _a.sent();
-                    return [4 /*yield*/, readChart("Nhato_Override")];
-                case 2:
-                    obj = _a.sent();
-                    game = new Game(obj, 10);
-                    game.loadBg();
-                    if (!auto) {
-                        document.addEventListener("keydown", function (event) {
-                            if (!isPaused) {
-                                var key = event.key.toUpperCase();
-                                var ki = key_bind.indexOf(key);
-                                if (ki != -1) {
-                                    score += game.hit(ki);
-                                    pressOn(ki);
-                                }
-                            }
-                        });
-                        document.addEventListener("keyup", function (event) {
-                            if (!isPaused) {
-                                var key = event.key.toUpperCase();
-                                var ki = key_bind.indexOf(key);
-                                if (ki != -1) {
-                                    pressOut(ki);
-                                }
-                            }
-                        });
+function Main(path) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield readSetting();
+        var obj = yield readChart(path);
+        var game = new Game(obj, 10);
+        game.loadBg();
+        yield game.loadContext();
+        if (!auto) {
+            document.addEventListener("keydown", (event) => {
+                if (!isPaused) {
+                    var key = event.key.toUpperCase();
+                    var ki = key_bind.indexOf(key);
+                    if (ki != -1) {
+                        score += game.hit(ki);
+                        pressOn(ki);
                     }
-                    getReady(game);
-                    return [2 /*return*/];
-            }
-        });
+                }
+            });
+            document.addEventListener("keyup", (event) => {
+                if (!isPaused) {
+                    var key = event.key.toUpperCase();
+                    var ki = key_bind.indexOf(key);
+                    if (ki != -1) {
+                        pressOut(ki);
+                    }
+                }
+            });
+        }
+        getReady(game);
     });
 }
-Main();
+Main("./chart/Override/Nhato_Override_Modified.json");

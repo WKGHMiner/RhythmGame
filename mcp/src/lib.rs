@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 
 static NOTE_PATTERN: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"\{"beat":\[(\d+),(\d+),(\d+)\],("endbeat":\[(\d+),(\d+),(\d+)\],)?"column":(\d+)\}"#
+        r#"\{"beat":\[(\d+),(\d+),(\d+)\],("endbeat":\[(\d+),(\d+),(\d+)\],)?("sound":"([^"]+)",)?("vol":([-]?\d+),)?("column":(\d+))?\}"#
     )
     .unwrap()
 });
@@ -48,7 +48,7 @@ static TRACK_PATTERN: Lazy<Regex> = Lazy::new(|| {
 
 static MUSIC_PATTERN: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#""sound":"([^"]+)""#
+        r#"\{"beat":\[0,0,1\],("sound":"([^"]+)",)?("vol":([-]?\d+),)?("offset":([-]?\d+),)?"type":1\}"#
     )
     .unwrap()
 });
@@ -64,7 +64,7 @@ static ILLUSTRATION_PATTERN: Lazy<Regex> = Lazy::new(|| {
 
 static OFFSET_PATTERN: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#""offset":(\d+)"#
+        r#""offset":([-]?\d+)"#
     )
     .unwrap()
 });
@@ -72,29 +72,30 @@ static OFFSET_PATTERN: Lazy<Regex> = Lazy::new(|| {
 
 struct Tap {
     beat: [i32; 3],
-    track: i32,
+    sound: Option<String>,
+    track: Option<i32>,
 }
 
 
 impl Tap {
-    pub fn new(beat: [i32; 3], track: i32) -> Self {
-        Self { beat, track }
+    pub fn new(beat: [i32; 3], sound: Option<String>, track: Option<i32>) -> Self {
+        Self { beat, sound, track }
     }
 }
 
 
 impl Display for Tap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Beat: {:?}\nTrack: {}", self.beat, self.track)
+        write!(f, "Beat: {:?}\nTrack: {:?}", self.beat, self.track)
     }
 }
 
 
-struct Chart {
+pub struct Chart {
     dir: String,
     name: String,
     composer: String,
-    music: String,
+    music: Option<String>,
     illustration: String,
     offset: i32,
     track: i32,
@@ -128,7 +129,7 @@ impl Chart {
         let notes = get_notes(&txt);
         let bpm = get_bpm(&txt);
 
-        music = format!("{}/{}", dir, music);
+        music = music.map(|s| { format!("{}/{}", dir, s) });
         illustration = format!("{}/{}", dir, illustration);
 
         Self { dir, name, composer, music, illustration, offset, track, bpm, notes }
@@ -176,7 +177,11 @@ impl Chart {
 
 
     fn write_music(&self, handle: &mut fs::File) {
-        let formatted = format!("\"music\":\"{}\",\n", self.music);
+        let formatted = if self.music.is_some() {
+            format!("\"music\":\"{}\",\n\"special\":false,\n", self.music.as_ref().unwrap())
+        } else {
+            "\"music\":null,\n\"special\":true,\n".to_string()
+        };
         let _ = handle.write(formatted.as_bytes());
     }
 
@@ -203,9 +208,18 @@ impl Chart {
         let _ = handle.write(b"\"notes\":[\n");
         
         for (index, note) in self.notes.iter().enumerate() {
+            let sound_format = if note.sound.is_some() {
+                format!("\"sound\": \"{}/{}\", ", self.dir, note.sound.as_ref().unwrap())
+            } else { String::new() };
+
+            let track_format = if note.track.is_some() {
+                format!("\"track\": {}, ", note.track.unwrap())
+            } else { String::new() };
+
             let formatted = format!(
-                "{{\"time\": {}, \"track\": {}, \"type\": 0}}{}",
-                self.time_notation(index), note.track,
+                "{{\"time\": {}, {}{}\"type\": 0}}{}",
+                self.time_notation(index), track_format,
+                sound_format,
                 if index == self.notes.len() - 1 { "" } else { ",\n" }
             );
             let _ = handle.write(formatted.as_bytes());
@@ -236,40 +250,53 @@ fn open_from_path(path: &str) -> String {
 
 fn get_notes(text: &str) -> Vec<Tap> {
     let mut res: Vec<Tap> = Vec::new();
-    for caps in NOTE_PATTERN.captures_iter(text) {
+    for (index, cap) in NOTE_PATTERN.captures_iter(text).enumerate() {
+        println!("Note id: {}", index);
+        for field in cap.iter() {
+            println!("{:?}", field);
+        }
+        println!();
+
+        let sound = if cap.get(9).is_some() {
+            Some(cap[9].to_string())
+        } else { None };
+
         res.push(Tap::new(
-            [caps[1].parse().unwrap(), caps[2].parse().unwrap(), caps[3].parse().unwrap()],
-            caps[8].parse().unwrap()
+            [cap[1].parse().unwrap(), cap[2].parse().unwrap(), cap[3].parse().unwrap()],
+            sound,
+            cap.get(13).map(|s| {s.as_str().parse().unwrap()})
         ));
     }
 
+    res.remove(0);
     res
 }
 
 
 fn get_bpm(text: &str) -> f32 {
-    let Some(cap) = BPM_PATTERN.captures(text) else { panic!("Failed to capture") };
-
-    if cap.len() == 2 {
-        cap[1].parse().unwrap()
+    if let Some(cap) = BPM_PATTERN.captures(text) {
+        if cap.len() == 2 {
+            cap[1].parse().unwrap()
+        } else {
+            let integer: f32 = cap[1].parse().unwrap();
+            let decimal: f32 = cap[2].parse().unwrap();
+    
+            integer + decimal
+        }
     } else {
-        let integer: f32 = cap[1].parse().unwrap();
-        let decimal: f32 = cap[2].parse().unwrap();
-
-        integer + decimal
+        120f32
     }
 }
 
 
 fn get_composer(text: &str) -> String {
-    let Some(cap) = COMPOSER_PATTERN.captures(text) else { panic!("Failed to capture") };
-
-    if cap.len() == 2 {
-        cap[1].to_string()
-    } else {
-        println!("{}", cap.len());
-        String::new()
+    if let Some(cap) = COMPOSER_PATTERN.captures(text) {
+        if cap.len() == 2 {
+            return cap[1].to_string();
+        }
     }
+
+    String::new()
 }
 
 
@@ -285,46 +312,44 @@ fn get_name(text: &str) -> String {
 
 
 fn get_track(text: &str) -> i32 {
-    let Some(cap) = TRACK_PATTERN.captures(text) else { panic!("Failed to capture") };
-
-    if cap.len() == 2 {
-        cap[1].parse().unwrap()
-    } else {
-        4
+    if let Some(cap) = TRACK_PATTERN.captures(text) {
+        if cap.len() == 2 {
+            return cap[1].parse().unwrap();
+        }
     }
+
+    4
 }
 
 
-fn get_music(text: &str) -> String {
-    let Some(cap) = MUSIC_PATTERN.captures(text) else { panic!("Failed to capture") };
-
-    if cap.len() == 2 {
-        cap[1].to_string()
+fn get_music(text: &str) -> Option<String> {
+    if let Some(cap) = MUSIC_PATTERN.captures(text) {
+        cap.get(2).map(|s| { s.as_str().to_string() })
     } else {
-        String::from("test.mp3")
+        None
     }
 }
 
 
 fn get_illustration(text: &str) -> String {
-    let Some(cap) = ILLUSTRATION_PATTERN.captures(text) else { panic!("Fail to capture") };
-
-    if cap.len() == 2 {
-        cap[1].to_string()
-    } else {
-        String::from("test.jpg")
+    if let Some(cap) = ILLUSTRATION_PATTERN.captures(text) {
+        if cap.len() == 2 {
+            return cap[1].to_string();
+        }
     }
+
+    String::from("test.jpg")
 }
 
 
 fn get_offset(text: &str) -> i32 {
-    let Some(cap) = OFFSET_PATTERN.captures(text) else {panic!("Failed to capture")};
-
-    if cap.len() == 2 {
-        cap[1].parse().unwrap()
-    } else {
-        0
+    if let Some(cap) = OFFSET_PATTERN.captures(text) {
+        if cap.len() == 2 {
+            return cap[1].parse().unwrap();
+        }
     }
+
+    0
 }
 
 
@@ -350,7 +375,9 @@ fn search_chart_from(dir: &str) -> Option<String> {
 
 
 fn extract_chart_dir(path: &str) -> String {
-    let mut comps: Vec<&str> = path.split("\\").collect();
+    let mut comps: Vec<&str> = path.split("\\")
+        .flat_map(|slice| { slice.split("/") })
+        .collect();
     
     if comps.len() > 1 {
         comps.pop();
@@ -371,4 +398,23 @@ pub fn auto_convert() {
 pub fn convert(path: &str) {
     let chart = Chart::from_path(path);
     chart.write_json();
+}
+
+
+#[cfg(test)]
+mod test {
+    use crate::{extract_chart_dir, get_music, get_offset, open_from_path};
+
+    #[test]
+    fn test_extract() {
+        extract_chart_dir("../chart/Never_Escape/key_4k_hard.mc");
+    }
+
+    
+    #[test]
+    fn test_get_music() {
+        let text = open_from_path("../chart/Override/Override.mc");
+        println!("{}", get_offset(&text));
+        println!("{:?}", get_music(&text))
+    }
 }

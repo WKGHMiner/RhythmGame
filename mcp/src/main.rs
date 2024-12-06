@@ -2,5 +2,5 @@ use mcp::*;
 
 
 fn main() {
-    auto_convert();
+    convert("../chart/Override/Override.mc");
 }

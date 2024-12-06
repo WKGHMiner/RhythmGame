@@ -1,8 +1,10 @@
 {
   "compileOnSave": true,
   "compilerOptions": {
-    "module": "CommonJS",
-    "target": "ES2020",
+    "moduleResolution": "node",
+    "module": "ES6",
+    "target": "ES6",
+    "esModuleInterop": true,
     "lib": [ "ES2015", "DOM", "DOM.Iterable", "ES2020" ],
     "sourceMap": false,
     "newLine": "crlf",
@@ -13,5 +15,6 @@
   "exclude": [
     "node_modules",
     "logs"
-  ]
+  ],
+  "type":["node"]
 }

@@ -4,7 +4,7 @@
     "key-bind": ["D", "F", "J", "K"],
     "duration": 50,
     "offset": 0,
-    "music-volume": 0.4,
+    "music-volume": 0.8,
     "sound-volume": 0.5,
     "auto": true
 }
