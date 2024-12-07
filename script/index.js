@@ -78,7 +78,7 @@ function readChart(path) {
     });
 }
 function getReady(game) {
-    document.addEventListener("keydown", (event) => __awaiter(this, void 0, void 0, function* () {
+    document.addEventListener("keydown", event => {
         if (!isReady) {
             isReady = true;
             var prompt = document.querySelector(".Prompt");
@@ -92,7 +92,7 @@ function getReady(game) {
                 }
             });
         }
-    }));
+    });
 }
 /** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
 export function showJudgement(judgement) {
@@ -101,21 +101,25 @@ export function showJudgement(judgement) {
             JUDGEMENT.innerText = "";
             return;
         case Judgement.Perfect:
+            perfect_count += 1;
             JUDGEMENT.innerText = "Perfect";
             JUDGEMENT.style.color = PERFECT_COLOR;
             PERFECT_COUNT.innerText = `${perfect_count}`;
             break;
         case Judgement.Good:
+            good_count += 1;
             JUDGEMENT.innerText = "Good";
             JUDGEMENT.style.color = GOOD_COLOR;
             GOOD_COUNT.innerText = `${good_count}`;
             break;
         case Judgement.Bad:
+            bad_count += 1;
             JUDGEMENT.innerText = "Bad";
             JUDGEMENT.style.color = BAD_COLOR;
             BAD_COUNT.innerText = `${bad_count}`;
             break;
         case Judgement.Miss:
+            miss_count += 1;
             JUDGEMENT.innerText = "Miss";
             JUDGEMENT.style.color = MISS_COLOR;
             MISS_COUNT.innerText = `${miss_count}`;
@@ -182,22 +186,7 @@ class Game {
     }
     loadEffect() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.isSpecial) {
-                try {
-                    const stream = yield navigator.mediaDevices.getDisplayMedia({
-                        audio: true,
-                        video: true,
-                        selfBrowserSurface: "include"
-                    });
-                    this.effect = new Effect(stream, this.context, this.isSpecial);
-                }
-                catch (err) {
-                    isVisualizeAllowed = false;
-                }
-            }
-            else {
-                this.effect = new Effect(this.music, this.context, this.isSpecial);
-            }
+            this.effect = new Effect(this.music, this.context, this.isSpecial);
         });
     }
     loadBg() {
@@ -252,7 +241,7 @@ class Game {
     }
     drawSingleTrack(index) {
         if (this.isSpecial) {
-            this.sounds.pop(this.context);
+            this.sounds.pop(this.context, this.effect.analyser);
         }
         var track = this.chart.tracks[index];
         for (var i = 0; i < track.length; i++) {
@@ -263,12 +252,12 @@ class Game {
                     break;
                 }
                 else {
-                    track.pop(this.context, this.isSpecial);
+                    this.hit(index);
                     i -= 1;
                 }
             }
             if (auto && note.isPerfect()) {
-                score += track.pop(this.context, this.isSpecial);
+                score += this.hit(index);
                 pressOn(index);
                 i -= 1;
                 setTimeout(_ => pressOut(index), duration);
@@ -276,7 +265,7 @@ class Game {
         }
     }
     hit(index) {
-        return this.chart.tracks[index].pop(this.context, this.isSpecial);
+        return this.chart.tracks[index].pop(this.context, this.isSpecial, this.effect.analyser);
     }
 }
 /** Main function
@@ -314,4 +303,4 @@ function Main(path) {
         getReady(game);
     });
 }
-Main("./chart/Override/Nhato_Override_Modified.json");
+Main("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape_Modified.json");

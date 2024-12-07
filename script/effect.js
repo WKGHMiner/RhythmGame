@@ -11,16 +11,13 @@ import { duration, global_time, mvolume } from "./index.js";
 import { Judgement } from "./play.js";
 export class Effect {
     constructor(audio, ctx, isSpecial) {
-        if (isSpecial) {
-            this.source = ctx.createMediaStreamSource(audio);
-        }
-        else {
-            this.source = ctx.createMediaElementSource(audio);
-        }
         this.analyser = ctx.createAnalyser();
         this.analyser.fftSize = 256;
-        this.source.connect(this.analyser);
-        this.analyser.connect(ctx.destination);
+        if (!isSpecial) {
+            this.source = ctx.createMediaElementSource(audio);
+            this.source.connect(this.analyser);
+            this.analyser.connect(ctx.destination);
+        }
         this.array = new Uint8Array(this.analyser.frequencyBinCount);
         this.canvas = document.querySelector(".Effect");
         this.canvas.height = this.canvas.clientHeight * window.devicePixelRatio;
@@ -125,7 +122,7 @@ export class AudioQueue {
         this.notes.push(note);
         this.length += 1;
     }
-    pop(context) {
+    pop(context, analyser) {
         var note;
         for (var index = 0; index < this.length; index++) {
             note = this.notes[index];
@@ -135,17 +132,17 @@ export class AudioQueue {
                 case Judgement.Miss:
                     break;
                 default:
-                    this.play(context, note);
+                    this.play(context, analyser, note);
             }
             this.notes.shift();
             this.length -= 1;
             index -= 1;
         }
     }
-    play(context, note) {
+    play(context, analyser, note) {
         return __awaiter(this, void 0, void 0, function* () {
             var path = note.sound;
-            console.log("Time: " + note.time);
+            console.log("Time: " + note.time + ", Remain: " + this.length);
             console.log("AudioNote: " + path);
             var audio = yield fetch(path);
             var buffer = yield context.decodeAudioData(yield audio.arrayBuffer());
@@ -153,8 +150,9 @@ export class AudioQueue {
             source.buffer = buffer;
             const gain = context.createGain();
             source.connect(gain);
-            gain.connect(context.destination);
-            gain.gain.setValueAtTime(0.75 * mvolume, context.currentTime);
+            gain.connect(analyser);
+            analyser.connect(context.destination);
+            gain.gain.setValueAtTime(mvolume, context.currentTime);
             source.start(0);
         });
     }

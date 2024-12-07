@@ -83,7 +83,7 @@ async function readChart(path: string): Promise<Object> {
 
 
 function getReady(game: Game) {
-    document.addEventListener("keydown", async event => {
+    document.addEventListener("keydown", event => {
         if (!isReady) {
             isReady = true;
 
@@ -112,24 +112,28 @@ export function showJudgement(judgement: Judgement) {
             return;
 
         case Judgement.Perfect:
+            perfect_count += 1;
             JUDGEMENT.innerText = "Perfect";
             JUDGEMENT.style.color = PERFECT_COLOR;
             PERFECT_COUNT.innerText = `${perfect_count}`;
             break;
             
         case Judgement.Good:
+            good_count += 1;
             JUDGEMENT.innerText = "Good";
             JUDGEMENT.style.color = GOOD_COLOR;
             GOOD_COUNT.innerText = `${good_count}`;
             break;
 
         case Judgement.Bad:
+            bad_count += 1;
             JUDGEMENT.innerText = "Bad";
             JUDGEMENT.style.color = BAD_COLOR;
             BAD_COUNT.innerText = `${bad_count}`;
             break;
 
         case Judgement.Miss:
+            miss_count += 1;
             JUDGEMENT.innerText = "Miss";
             JUDGEMENT.style.color = MISS_COLOR;
             MISS_COUNT.innerText = `${miss_count}`;
@@ -221,20 +225,7 @@ class Game {
 
 
     async loadEffect() {
-        if (this.isSpecial) {
-            try {
-                const stream = await navigator.mediaDevices.getDisplayMedia({
-                    audio: true,
-                    video: true,
-                    selfBrowserSurface: "include"
-                });
-                this.effect = new Effect(stream, this.context, this.isSpecial);
-            } catch (err) {
-                isVisualizeAllowed = false;
-            }
-        } else {
-            this.effect = new Effect(this.music, this.context, this.isSpecial);
-        }
+        this.effect = new Effect(this.music, this.context, this.isSpecial);
     }
 
 
@@ -300,7 +291,7 @@ class Game {
 
     drawSingleTrack(index: number) {
         if (this.isSpecial) {
-            this.sounds.pop(this.context);
+            this.sounds.pop(this.context, this.effect.analyser);
         }
 
         var track: Track = this.chart.tracks[index];
@@ -312,13 +303,13 @@ class Game {
                 if (note.isWaiting()) {
                     break;
                 } else {
-                    track.pop(this.context, this.isSpecial);
+                    this.hit(index);
                     i -= 1;
                 }
             }
 
             if (auto && note.isPerfect()) {
-                score += track.pop(this.context, this.isSpecial);
+                score += this.hit(index);
                 pressOn(index);
                 i -= 1;
 
@@ -329,7 +320,7 @@ class Game {
 
 
     hit(index: number): number {
-        return this.chart.tracks[index].pop(this.context, this.isSpecial);
+        return this.chart.tracks[index].pop(this.context, this.isSpecial, this.effect.analyser);
     }
 }
 
@@ -375,4 +366,4 @@ async function Main(path: string) {
 }
 
 
-Main("./chart/Override/Nhato_Override_Modified.json")
+Main("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape_Modified.json")

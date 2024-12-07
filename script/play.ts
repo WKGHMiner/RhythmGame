@@ -108,19 +108,15 @@ export class Track {
      * Trys to pop out notes based on `global_time`,
      * and return the score based on judgement.
      */
-    pop(context: AudioContext, isSpecial: boolean): number {
-        if (this.length == 0) {
-            return 0;
-        }
-        
-        if (this.notes[0].isWaiting()) {
+    pop(context: AudioContext, isSpecial: boolean, analyser: AnalyserNode): number {
+        if (this.length == 0 || this.notes[0].isWaiting()) {
             return 0;
         }
 
         var note = this.deleteHead();
         var res = note.judge(global_time);
         if (res[0] != Judgement.Miss) {
-            this.hitSound(context, note, isSpecial);
+            this.hitSound(context, note, isSpecial, analyser);
         }
 
         showJudgement(res[0]);
@@ -143,7 +139,7 @@ export class Track {
     }
 
 
-    async hitSound(context: AudioContext, note: Note, isSpecial: boolean) {
+    async hitSound(context: AudioContext, note: Note, isSpecial: boolean, analyser: AnalyserNode) {
         var path: string = note.getSound();
         console.log("Id: " + note.id + ", Time: ", note.time);
         console.log("Hit sound:" + path);
@@ -156,12 +152,14 @@ export class Track {
 
         const gain = context.createGain();
         source.connect(gain);
-        gain.connect(context.destination);
-
-        if (!isSpecial) {
-            gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
+        
+        if (isSpecial) {
+            gain.connect(analyser);
+            analyser.connect(context.destination);
+            gain.gain.setValueAtTime(mvolume, context.currentTime);
         } else {
-            gain.gain.setValueAtTime(0.75 * mvolume, context.currentTime);
+            gain.connect(context.destination);
+            gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
         }
         source.start(0);
     }

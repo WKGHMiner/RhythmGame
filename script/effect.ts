@@ -14,18 +14,15 @@ export class Effect {
     radial: number;
     theta: number;
 
-    constructor(audio: HTMLAudioElement | MediaStream, ctx: AudioContext, isSpecial: boolean) {
-        if (isSpecial) {
-            this.source = ctx.createMediaStreamSource(audio as MediaStream);
-        } else {
-            this.source = ctx.createMediaElementSource(audio as HTMLAudioElement);
-        }
-
+    constructor(audio: HTMLAudioElement, ctx: AudioContext, isSpecial: boolean) {
         this.analyser = ctx.createAnalyser();
         this.analyser.fftSize = 256;
         
-        this.source.connect(this.analyser);
-        this.analyser.connect(ctx.destination);
+        if (!isSpecial) {
+            this.source = ctx.createMediaElementSource(audio);
+            this.source.connect(this.analyser);
+            this.analyser.connect(ctx.destination);
+        }
 
         this.array = new Uint8Array(this.analyser.frequencyBinCount);
         
@@ -82,9 +79,9 @@ export class Effect {
         if (this.salt <= 0.33) {
             
         } else if (this.salt <= 0.67) {
-            color.push(color.shift() as number);
+            color.push(color.shift());
         } else {
-            color.unshift(color.pop() as number);
+            color.unshift(color.pop());
         }
 
         return color;
@@ -169,7 +166,7 @@ export class AudioQueue {
     }
 
 
-    pop(context: AudioContext) {
+    pop(context: AudioContext, analyser: AnalyserNode) {
         var note: AudioNote;
         for (var index = 0; index < this.length; index ++) {
             note = this.notes[index];
@@ -182,7 +179,7 @@ export class AudioQueue {
                     break;
 
                 default:
-                    this.play(context, note);
+                    this.play(context, analyser, note);
             }
 
             this.notes.shift();
@@ -192,9 +189,9 @@ export class AudioQueue {
     }
 
 
-    async play(context: AudioContext, note: AudioNote) {
+    async play(context: AudioContext, analyser: AnalyserNode, note: AudioNote) {
         var path: string = note.sound;
-        console.log("Time: " + note.time);
+        console.log("Time: " + note.time + ", Remain: " + this.length);
         console.log("AudioNote: " + path);
 
         var audio = await fetch(path);
@@ -205,9 +202,10 @@ export class AudioQueue {
 
         const gain = context.createGain();
         source.connect(gain);
-        gain.connect(context.destination);
+        gain.connect(analyser);
+        analyser.connect(context.destination);
 
-        gain.gain.setValueAtTime(0.75 * mvolume, context.currentTime);
+        gain.gain.setValueAtTime(mvolume, context.currentTime);
         source.start(0);
     }
 }
