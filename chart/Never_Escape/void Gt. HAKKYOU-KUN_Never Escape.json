@@ -1,7 +1,7 @@
 {
 "name":"Never Escape",
 "composer":"void Gt. HAKKYOU-KUN",
-"music":null,
+"music":"../chart/Never_Escape/Auto_Generated_Audio.wav",
 "special":true,
 "illustration":"../chart/Never_Escape/bg.jpg",
 "offset":0,

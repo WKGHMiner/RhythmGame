@@ -7,7 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { TRACKS, global_time, svolume, mvolume, duration, render_duration, auto, showJudgement, updateHit } from "./index.js";
+import { TRACKS, global_time, svolume, mvolume, duration, render_duration, isAuto, showJudgement, updateHit } from "./game.js";
 import { AudioNote } from "./effect.js";
 /** Chart class:
  *
@@ -237,7 +237,7 @@ export class ExTap extends Tap {
             return [Judgement.Waiting, 0, 1];
         }
         else {
-            if ((auto && Math.abs(gap) < duration) || !auto) {
+            if ((isAuto && Math.abs(gap) < duration) || !isAuto) {
                 return [Judgement.Perfect, 1500, 1];
             }
             else {

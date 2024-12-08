@@ -7,7 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { duration, global_time, mvolume } from "./index.js";
+import { duration, global_time, mvolume } from "./game.js";
 import { Judgement } from "./play.js";
 export class Effect {
     constructor(audio, ctx, isSpecial) {

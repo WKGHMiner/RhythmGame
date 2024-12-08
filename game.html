@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Game</title>
+    
+    <link rel="stylesheet" href="./css/game.css">
+    <link rel="stylesheet" href="./css/play.css">
+    <link rel="stylesheet" href="./css/effect.css">
+
+    <link rel="shortcut icon" href="./favicon.ico">
+</head>
+<body>
+    <div class="MainContainer">
+        <div class="Prompt">
+            Press Any Key To Start!
+        </div>
+
+        <div class="Paused">
+            Paused
+            <p>- Press "Escape" To Continue! -</p>
+        </div>
+
+        <div class="Background"></div>
+        
+        <div class="EffectContainer">
+            <div class="IllustrationContainer">
+                <img class="Illustration" alt="No Illustration">
+            </div>
+            <canvas class="Effect" id="effect"></canvas>
+        </div>
+        <div class="GameContainer">
+            <div class="Play">
+                <div class="TrackContainer">
+                    <div class="Track" id="Track0"></div>
+                    <div class="HitBox" id="HitBox0"></div>
+                </div>
+                <div class="TrackContainer">
+                    <div class="Track" id="Track1"></div>
+                    <div class="HitBox" id="HitBox1"></div>
+                </div>
+                <div class="TrackContainer">
+                    <div class="Track" id="Track2"></div>
+                    <div class="HitBox" id="HitBox2"></div>
+                </div>
+                <div class="TrackContainer">
+                    <div class="Track" id="Track3"></div>
+                    <div class="HitBox" id="HitBox3"></div>
+                </div>
+            </div>
+
+            <div class="Score">SCORE: 0</div>
+            <div class="Judgement"></div>
+            <div class="HitCount"></div>
+
+            <div class="Perfect">Perfect</div>
+            <div class="PerfectCount">0</div>
+
+            <div class="Good">Good</div>
+            <div class="GoodCount">0</div>
+
+            <div class="Bad">Bad</div>
+            <div class="BadCount">0</div>
+
+            <div class="Miss">Miss</div>
+            <div class="MissCount">0</div>
+        </div>
+    </div>
+    <script>exports = {}</script>
+    <script type="module" src="./script/game.js"></script>
+</body>
+</html>
