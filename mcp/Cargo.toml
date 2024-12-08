@@ -1,7 +1,10 @@
 [package]
 name = "mcp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+license = "No License"
+repository = "https://github.com/WKGHMiner/RhythmGame/"
+
 
 [lib]
 path = "./src/lib.rs"

@@ -7,7 +7,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { Chart, Judgement } from "./play.js";
+import { Chart } from "./play.js";
+import { Judgement } from "./notes.js";
 import { Effect, AudioQueue } from "./effect.js";
 /** HTML element set of Tracks. */
 export const TRACKS = document.querySelectorAll(".Track");

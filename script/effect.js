@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { duration, global_time, mvolume } from "./game.js";
-import { Judgement } from "./play.js";
+import { Judgement } from "./notes.js";
 export class Effect {
     constructor(audio, ctx, isSpecial) {
         this.analyser = ctx.createAnalyser();

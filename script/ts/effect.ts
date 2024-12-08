@@ -1,5 +1,5 @@
 import { duration, global_time, mvolume } from "./game.js";
-import { Base, Judgement } from "./play.js";
+import { Base, Judgement } from "./notes.js";
 
 
 export class Effect {

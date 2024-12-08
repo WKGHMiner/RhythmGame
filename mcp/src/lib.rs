@@ -209,73 +209,85 @@ impl Chart {
     }
 
 
-    pub fn write_json(&self) -> String {
+    /// Returning generated chart literal.
+    fn write_literal(&self) -> String {
+        let mut literal = String::new();
+
+        literal.push_str("{\n");
+
+        self.write_name(&mut literal);
+        self.write_composer(&mut literal);
+        self.write_music(&mut literal);
+        self.write_illustration(&mut literal);
+        self.write_offset(&mut literal);
+        self.write_track(&mut literal);
+        self.write_notes(&mut literal);
+
+        literal.push_str("\n}");
+
+        literal
+    }
+
+
+    /// Returning generated json path.
+    fn write_json(&self) -> String {
         let format_path = format!("{}/{}_{}.json", self.dir, self.composer, self.name);
 
-        let mut handle = match fs::File::create(format_path.clone()) {
+        let mut handle = match fs::File::create(&format_path) {
             Ok(handle) => handle,
             Err(e) => unreachable!("Some Error occured while creating file: {e}"),
         };
 
-        let _ = handle.write(b"{\n");
-
-        self.write_name(&mut handle);
-        self.write_composer(&mut handle);
-        self.write_music(&mut handle);
-        self.write_illustration(&mut handle);
-        self.write_offset(&mut handle);
-        self.write_track(&mut handle);
-        self.write_notes(&mut handle);
-
-        let _ = handle.write(b"\n}");
+        let literal = self.write_literal();
+        let _ = handle.write(literal.as_bytes());
 
         format_path
     }
 
 
-    fn write_composer(&self, handle: &mut fs::File) {
+    fn write_composer(&self, literal: &mut String) {
         let formatted = format!("\"composer\":\"{}\",\n", self.composer);
-        let _ = handle.write(formatted.as_bytes());
+        literal.push_str(&formatted);
     }
     
     
-    fn write_name(&self, handle: &mut fs::File) {
+    fn write_name(&self, literal: &mut String) {
         let formatted = format!("\"name\":\"{}\",\n", self.name);
-        let _ = handle.write(formatted.as_bytes());
+        literal.push_str(&formatted);
     }
 
 
-    fn write_music(&self, handle: &mut fs::File) {
+    fn write_music(&self, literal: &mut String) {
         let formatted = if self.music.is_some() {
             format!("\"music\":\"{}\",\n\"special\":false,\n", self.music.as_ref().unwrap())
         } else {
             self.generate_audio();
             format!("\"music\":\"{}/Auto_Generated_Audio.wav\",\n\"special\":true,\n", self.dir)
         };
-        let _ = handle.write(formatted.as_bytes());
+        literal.push_str(&formatted);
     }
 
 
-    fn write_illustration(&self, handle: &mut fs::File) {
+    fn write_illustration(&self, literal: &mut String) {
         let formatted = format!("\"illustration\":\"{}\",\n", self.illustration);
-        let _ = handle.write(formatted.as_bytes());
+        literal.push_str(&formatted);
     }
 
 
-    fn write_offset(&self, handle: &mut fs::File) {
+    fn write_offset(&self, literal: &mut String) {
         let formatted = format!("\"offset\":{},\n", self.offset);
-        let _ = handle.write(formatted.as_bytes());
+        literal.push_str(&formatted);
     }
 
 
-    fn write_track(&self, handle: &mut fs::File) {
+    fn write_track(&self, literal: &mut String) {
         let formatted = format!("\"track\":{},\n", self.track);
-        let _ = handle.write(formatted.as_bytes());
+        literal.push_str(&formatted);
     }
 
 
-    fn write_notes(&self, handle: &mut fs::File) {
-        let _ = handle.write(b"\"notes\":[\n");
+    fn write_notes(&self, literal: &mut String) {
+        literal.push_str("\"notes\":[\n");
         
         for (index, note) in self.notes.iter().enumerate() {
             let sound_format = if note.sound.is_some() {
@@ -292,10 +304,10 @@ impl Chart {
                 sound_format,
                 if index == self.notes.len() - 1 { "" } else { ",\n" }
             );
-            let _ = handle.write(formatted.as_bytes());
+            literal.push_str(&formatted);
         }
 
-        let _ = handle.write(b"]");
+        literal.push(']');
     }
 
 
@@ -500,11 +512,29 @@ pub fn auto_convert() {
 }
 
 
+/// Convert a malody chart (.mcz) into chart json.
 #[no_mangle]
 #[wasm_bindgen]
 pub fn convert(path: &str) -> String {
-    let chart = Chart::from_path(path);
-    chart.write_json()
+    if path.contains(".mcz") {
+        let chart = Chart::from_path(path);
+        chart.write_json()
+    } else {
+        panic!("Expected a malody chart whose file name end with '.mcz', got {}.", path)
+    }
+}
+
+
+/// Convert a malody chart (.mcz) into chart literal.
+#[no_mangle]
+#[wasm_bindgen]
+pub fn convert_as_string(path: &str) -> String {
+    if path.contains(".mcz") {
+        let chart = Chart::from_path(path);
+        chart.write_literal()
+    } else {
+        panic!("Expected a malody chart whose file name end with '.mcz', got {}.", path)
+    }
 }
 
 

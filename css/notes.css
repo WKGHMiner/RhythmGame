@@ -1,0 +1,25 @@
+.Tap, .ExTap {
+    position: absolute;
+    top: 0%;
+    width: 100%;
+    height: 7%;
+    border: 1px solid rgba(61, 61, 61, 0.9);
+    border-radius: 12%;
+    z-index: 5;
+}
+
+
+.Tap {
+    background: radial-gradient(
+        rgba(92, 212, 255, 0.9),
+        rgba(42, 170, 216, 0.9)
+    );
+}
+
+
+.ExTap {
+    background: radial-gradient(
+        rgba(239, 255, 92, 0.9),
+        rgba(213, 216, 42, 0.9)
+    );
+}

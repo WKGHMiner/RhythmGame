@@ -1,4 +1,5 @@
-import { Chart, Track, Judgement } from "./play.js";
+import { Chart, Track } from "./play.js";
+import { Judgement } from "./notes.js";
 import { Effect, AudioQueue } from "./effect.js";
 
 
