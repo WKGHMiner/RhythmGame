@@ -20,6 +20,7 @@ export class Chart {
     tracks: Track[];
     track: number;
     offset: number;
+    object: Object;
 
     constructor(object: Object, sounds: AudioQueue) {
         this.name = object["name"];
@@ -30,6 +31,7 @@ export class Chart {
         this.track = object["track"];
         this.tracks = [];
         this.offset = object["offset"];
+        this.object = object;
 
         for (var _ = 0; _ < this.track; _ ++) {
             this.tracks.push(new Track());
@@ -37,7 +39,7 @@ export class Chart {
 
         document.title = `${this.composer} - ${this.name}`;
 
-        this.loadChart(object, sounds);
+        this.loadChart(sounds);
     }
 
 
@@ -49,8 +51,13 @@ export class Chart {
     }
 
 
-    loadChart(object: Object, sounds: AudioQueue) {
-        var notes: Object[] = object["notes"];
+    loadChart(sounds: AudioQueue) {
+        if (this.object != undefined) {
+            this.tracks.forEach(track => track.clear());
+            sounds.clear();
+        }
+        
+        var notes: Object[] = this.object["notes"];
         notes.sort((a, b) => a["time"] - b["time"]);
 
         for (var index = 0; index < notes.length; index ++) {
@@ -162,5 +169,19 @@ export class Track {
             gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
         }
         source.start(0);
+    }
+
+
+    clear() {
+        while (this.length != 0) {
+            var note = this.notes.pop();
+            var elem = document.getElementById(`Note${note.id}`);
+
+            if (elem) {
+                TRACKS[note.track].removeChild(elem);
+            }
+
+            this.length -= 1;
+        }
     }
 }

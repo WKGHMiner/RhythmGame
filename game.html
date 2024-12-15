@@ -19,9 +19,14 @@
             Press Any Key To Start!
         </div>
 
+        <button class="PauseBtn"></button>
+
         <div class="Paused">
             Paused
             <p>- Press "Escape" To Continue! -</p>
+            <button class="PauseBtn">Continue</button>
+            <button class="RestartBtn">Restart</button>
+            <button onclick="exit()">Exit</button>
         </div>
 
         <div class="Background"></div>
@@ -32,6 +37,7 @@
             </div>
             <canvas class="Effect" id="effect"></canvas>
         </div>
+        
         <div class="GameContainer">
             <div class="Play">
                 <div class="TrackContainer">
@@ -69,7 +75,12 @@
             <div class="MissCount">0</div>
         </div>
     </div>
-    <script>exports = {}</script>
+    <script>
+        function exit() {
+            sessionStorage.clear();
+            window.location.href = "./index.html";
+        }
+    </script>
     <script type="module" src="./script/game.js"></script>
 </body>
 </html>

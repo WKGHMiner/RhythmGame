@@ -30,7 +30,7 @@ export class Effect {
         this.radial = illustration.clientHeight * 0.75;
         this.theta = 0;
     }
-    set fftSize(size) {
+    setFftSize(size) {
         this.analyser.fftSize = size;
     }
     get frequencyBinCount() {
@@ -74,10 +74,10 @@ export class Effect {
         return current;
     }
     draw() {
-        this.changeStyle();
         var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
         var width = this.canvas.width / 2;
         var height = this.canvas.height;
+        this.changeStyle();
         this.clear();
         var angle = Math.PI * 2 / this.frequencyBinCount;
         this.cvsCtx.save();
@@ -117,6 +117,7 @@ export class AudioQueue {
     constructor() {
         this.length = 0;
         this.notes = new Array();
+        this.srcs = new Array();
     }
     push(note) {
         this.notes.push(note);
@@ -153,7 +154,19 @@ export class AudioQueue {
             gain.connect(analyser);
             analyser.connect(context.destination);
             gain.gain.setValueAtTime(mvolume, context.currentTime);
+            this.srcs.push(source);
             source.start(0);
         });
+    }
+    clear() {
+        while (this.length != 0) {
+            this.notes.pop();
+            this.length -= 1;
+        }
+        while (this.srcs.length != 0) {
+            var src = this.srcs.pop();
+            src.stop();
+            src.disconnect();
+        }
     }
 }

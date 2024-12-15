@@ -17,20 +17,6 @@ pub struct Tree<T> {
 }
 
 
-fn open_img(path: &str) {
-    let reader = match image::ImageReader::open(path) {
-        Ok(reader) => match reader.decode() {
-            Ok(res) => res,
-            Err(e) => panic!("Decode error: {}", e),
-        },
-        Err(e) => panic!("Cannot open [{}]: {}", path, e),
-    };
-
-    let buffer = reader.as_rgb8().unwrap();
-    for (_, _, pixel) in buffer.enumerate_pixels() {}
-}
-
-
 #[cfg(test)]
 mod test {
     use crate::*;

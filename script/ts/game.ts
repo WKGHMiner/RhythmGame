@@ -38,6 +38,7 @@ const HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8
 var setting: Object;
 var key_bind: string[];
 export var render_duration: number = 500;
+export var speed: number = 10;
 export var duration: number = 40;
 export var offset: number = 0;
 export var mvolume: number = 0.4;
@@ -66,25 +67,39 @@ var isEnded: boolean = false;
 
 
 /** Read `setting.json` to update settings. */
-async function readSetting() {
+export async function readSetting() {
     setting = await (await fetch("./setting.json")).json();
+
     key_bind = setting["key-bind"];
     render_duration = setting["render-duration"];
+    speed = setting["speed"];
     duration = setting["duration"];
     isAuto = setting["auto"];
+    isVisualizeAllowed = setting["allow-visualisation"];
     mvolume = setting["music-volume"];
     svolume = setting["sound-volume"];
 }
 
 
-async function readChart(path: string): Promise<Object> {
-    var obj: Object = await (await fetch(path)).json();
-    return obj;
+/** Read `SessionStorage` to update settings. */
+function readStorage() {
+    if (sessionStorage.length != 0) {
+        key_bind = sessionStorage["key-bind"];
+        render_duration = sessionStorage["render-duration"];
+        speed = sessionStorage["speed"];
+        duration = sessionStorage["duration"];
+        isAuto = sessionStorage["auto"];
+        isVisualizeAllowed = sessionStorage["allow-visualisation"];
+        mvolume = sessionStorage["music-volume"];
+        svolume = sessionStorage["sound-volume"];
+    } else {
+        window.alert("Invalid session data!");
+    }
 }
 
 
 function getReady(game: Game) {
-    document.addEventListener("keydown", event => {
+    document.addEventListener("keydown", _ => {
         if (!isReady) {
             isReady = true;
 
@@ -92,6 +107,12 @@ function getReady(game: Game) {
             var mc = document.querySelector(".MainContainer") as HTMLDivElement;
             mc.removeChild(prompt);
             prompt.remove();
+
+            var btns = document.querySelectorAll(".PauseBtn") as NodeListOf<HTMLButtonElement>;
+            btns.forEach(btn => btn.onclick = function() { game.pause() });
+
+            var restartButton = document.querySelector(".RestartBtn") as HTMLDivElement;
+            restartButton.addEventListener("click", _ => { game.restart() });
             
             game.start();
 
@@ -101,7 +122,7 @@ function getReady(game: Game) {
                 }
             })
         }
-    })
+    }, { once: true })
 }
 
 
@@ -185,20 +206,32 @@ function pressOut(index: number) {
 }
 
 
+function exit() {
+    sessionStorage.clear();
+    document.location.href = "../index.html";
+}
+
+
 class Game {
-    speed: number;
+    speed: number = speed;
     chart: Chart;
-    sounds: AudioQueue;
+    sounds: AudioQueue = new AudioQueue();
     effect: Effect;
     start_time: number;
     offset: number;
     music: HTMLAudioElement;
     context: AudioContext;
 
-    constructor(obj: Object, speed: number) {
-        this.sounds = new AudioQueue();
-        this.chart = new Chart(obj, this.sounds);
-        this.speed = speed;
+    constructor(obj?: Object, literal?: string) {
+        if (obj) {
+            this.chart = new Chart(obj, this.sounds);
+        } else if (literal) {
+            let obj: Object = JSON.parse(literal);
+            this.chart = new Chart(obj, this.sounds);
+        } else {
+            throw Error("Game class can be only initalized with one parameter.");
+        }
+
         this.offset = this.chart.offset + offset;
     }
 
@@ -221,7 +254,9 @@ class Game {
 
         await this.loadEffect();
 
-        this.music.addEventListener("ended", event => { isEnded = true })
+        this.music.addEventListener("ended", _ => {
+            isEnded = true;
+        }, {once: true});
     }
 
 
@@ -246,7 +281,7 @@ class Game {
             this.music.play();
             requestAnimationFrame(_ => this.drawAll());
         } else if (isEnded) {
-            // TODO: Unimplemented.
+            exit();
             return;
         } else {
             PAUSED.style.visibility = "visible";
@@ -275,7 +310,7 @@ class Game {
         }
 
         if (isVisualizeAllowed) {
-            requestAnimationFrame(_ => this.effect.draw());
+            this.effect.draw()
         }
     
         if (isEnded) {
@@ -323,18 +358,62 @@ class Game {
     hit(index: number): number {
         return this.chart.tracks[index].pop(this.context, this.isSpecial, this.effect.analyser);
     }
+
+
+    restart() {
+        this.music.currentTime = 0;
+        this.start_time = this.context.currentTime;
+        this.chart.loadChart(this.sounds);
+        
+        score = 0;
+        perfect_count = 0;
+        good_count = 0;
+        bad_count = 0;
+        miss_count = 0;
+        max_hit = 0;
+        current_hit = 0;
+
+        showJudgement(Judgement.Waiting);
+        HIT_COUNT.innerText = "";
+        SCORE.innerText = "SCORE: 0";
+
+        this.pause();
+        this.music.play();
+        this.context.resume();
+    }
 }
 
 
 /** Main function
  * 
  *  Integrates and choronously calls async functions, ensuring workflow.
+ * 
+ *  @param path The path of chart json file.
  */
-export async function Main(path: string) {
+export async function MainbyRead(path: string) {
     await readSetting();
-    var obj = await readChart(path);
-    var game = new Game(obj, 10);
+    var obj: Object = await (await fetch(path)).json();
+    var game = new Game(obj);
 
+    await MainBody(game)
+}
+
+
+/** Main function
+ * 
+ *  Integrates and choronously calls async functions, ensuring workflow.
+ * 
+ *  @param literal The text content of chart json file.
+ */
+export async function MainByConvert(literal: string) {
+    readStorage();
+    var game = new Game(literal);
+
+    await MainBody(game);
+}
+
+
+async function MainBody(game: Game) {
     game.loadBg();
     await game.loadContext();
 
@@ -367,4 +446,23 @@ export async function Main(path: string) {
 }
 
 
-Main("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape.json")
+function Main() {
+    var path = sessionStorage.getItem("path");
+    if (path != null) {
+        MainbyRead(path);
+        return;
+    }
+
+    var literal = sessionStorage.getItem("literal");
+    if (literal != null) {
+        MainByConvert(literal);
+        return;
+    }
+
+    window.alert("Invalid Chart Infomation.");
+    exit();
+}
+
+
+// MainbyRead("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape.json");
+MainbyRead("./chart/Override/Nhato_Override_Modified.json");

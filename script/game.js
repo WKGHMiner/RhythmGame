@@ -39,6 +39,7 @@ const HITUP = "radial-gradient(rgba(170, 170, 170, 0.8), rgba(126, 126, 126, 0.8
 var setting;
 var key_bind;
 export var render_duration = 500;
+export var speed = 10;
 export var duration = 40;
 export var offset = 0;
 export var mvolume = 0.4;
@@ -61,31 +62,47 @@ var isVisualizeAllowed = true;
 var isPaused = false;
 var isEnded = false;
 /** Read `setting.json` to update settings. */
-function readSetting() {
+export function readSetting() {
     return __awaiter(this, void 0, void 0, function* () {
         setting = yield (yield fetch("./setting.json")).json();
         key_bind = setting["key-bind"];
         render_duration = setting["render-duration"];
+        speed = setting["speed"];
         duration = setting["duration"];
         isAuto = setting["auto"];
+        isVisualizeAllowed = setting["allow-visualisation"];
         mvolume = setting["music-volume"];
         svolume = setting["sound-volume"];
     });
 }
-function readChart(path) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var obj = yield (yield fetch(path)).json();
-        return obj;
-    });
+/** Read `SessionStorage` to update settings. */
+function readStorage() {
+    if (sessionStorage.length != 0) {
+        key_bind = sessionStorage["key-bind"];
+        render_duration = sessionStorage["render-duration"];
+        speed = sessionStorage["speed"];
+        duration = sessionStorage["duration"];
+        isAuto = sessionStorage["auto"];
+        isVisualizeAllowed = sessionStorage["allow-visualisation"];
+        mvolume = sessionStorage["music-volume"];
+        svolume = sessionStorage["sound-volume"];
+    }
+    else {
+        window.alert("Invalid session data!");
+    }
 }
 function getReady(game) {
-    document.addEventListener("keydown", event => {
+    document.addEventListener("keydown", _ => {
         if (!isReady) {
             isReady = true;
             var prompt = document.querySelector(".Prompt");
             var mc = document.querySelector(".MainContainer");
             mc.removeChild(prompt);
             prompt.remove();
+            var btns = document.querySelectorAll(".PauseBtn");
+            btns.forEach(btn => btn.onclick = function () { game.pause(); });
+            var restartButton = document.querySelector(".RestartBtn");
+            restartButton.addEventListener("click", _ => { game.restart(); });
             game.start();
             document.addEventListener("keydown", event => {
                 if (event.key == "Escape") {
@@ -93,7 +110,7 @@ function getReady(game) {
                 }
             });
         }
-    });
+    }, { once: true });
 }
 /** Change the style and text of `JUDGEMENT` element based on `Judgement`. */
 export function showJudgement(judgement) {
@@ -160,11 +177,24 @@ function pressOut(index) {
     HITBOX[index].style.background = HITUP;
     TRACKS[index].style.background = TRACKUP;
 }
+function exit() {
+    sessionStorage.clear();
+    document.location.href = "../index.html";
+}
 class Game {
-    constructor(obj, speed) {
-        this.sounds = new AudioQueue();
-        this.chart = new Chart(obj, this.sounds);
+    constructor(obj, literal) {
         this.speed = speed;
+        this.sounds = new AudioQueue();
+        if (obj) {
+            this.chart = new Chart(obj, this.sounds);
+        }
+        else if (literal) {
+            let obj = JSON.parse(literal);
+            this.chart = new Chart(obj, this.sounds);
+        }
+        else {
+            throw Error("Game class can be only initalized with one parameter.");
+        }
         this.offset = this.chart.offset + offset;
     }
     get isSpecial() {
@@ -182,7 +212,9 @@ class Game {
                 this.music.volume = mvolume;
             }
             yield this.loadEffect();
-            this.music.addEventListener("ended", event => { isEnded = true; });
+            this.music.addEventListener("ended", _ => {
+                isEnded = true;
+            }, { once: true });
         });
     }
     loadEffect() {
@@ -204,7 +236,7 @@ class Game {
             requestAnimationFrame(_ => this.drawAll());
         }
         else if (isEnded) {
-            // TODO: Unimplemented.
+            exit();
             return;
         }
         else {
@@ -227,7 +259,7 @@ class Game {
             this.drawSingleTrack(index);
         }
         if (isVisualizeAllowed) {
-            requestAnimationFrame(_ => this.effect.draw());
+            this.effect.draw();
         }
         if (isEnded) {
             JUDGEMENT.innerText = "";
@@ -268,16 +300,54 @@ class Game {
     hit(index) {
         return this.chart.tracks[index].pop(this.context, this.isSpecial, this.effect.analyser);
     }
+    restart() {
+        this.music.currentTime = 0;
+        this.start_time = this.context.currentTime;
+        this.chart.loadChart(this.sounds);
+        score = 0;
+        perfect_count = 0;
+        good_count = 0;
+        bad_count = 0;
+        miss_count = 0;
+        max_hit = 0;
+        current_hit = 0;
+        showJudgement(Judgement.Waiting);
+        HIT_COUNT.innerText = "";
+        SCORE.innerText = "SCORE: 0";
+        this.pause();
+        this.music.play();
+        this.context.resume();
+    }
 }
 /** Main function
  *
  *  Integrates and choronously calls async functions, ensuring workflow.
+ *
+ *  @param path The path of chart json file.
  */
-export function Main(path) {
+export function MainbyRead(path) {
     return __awaiter(this, void 0, void 0, function* () {
         yield readSetting();
-        var obj = yield readChart(path);
-        var game = new Game(obj, 10);
+        var obj = yield (yield fetch(path)).json();
+        var game = new Game(obj);
+        yield MainBody(game);
+    });
+}
+/** Main function
+ *
+ *  Integrates and choronously calls async functions, ensuring workflow.
+ *
+ *  @param literal The text content of chart json file.
+ */
+export function MainByConvert(literal) {
+    return __awaiter(this, void 0, void 0, function* () {
+        readStorage();
+        var game = new Game(literal);
+        yield MainBody(game);
+    });
+}
+function MainBody(game) {
+    return __awaiter(this, void 0, void 0, function* () {
         game.loadBg();
         yield game.loadContext();
         if (!isAuto) {
@@ -304,4 +374,19 @@ export function Main(path) {
         getReady(game);
     });
 }
-Main("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape.json");
+function Main() {
+    var path = sessionStorage.getItem("path");
+    if (path != null) {
+        MainbyRead(path);
+        return;
+    }
+    var literal = sessionStorage.getItem("literal");
+    if (literal != null) {
+        MainByConvert(literal);
+        return;
+    }
+    window.alert("Invalid Chart Infomation.");
+    exit();
+}
+MainbyRead("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape.json");
+// MainbyRead("./chart/Override/Nhato_Override_Modified.json");

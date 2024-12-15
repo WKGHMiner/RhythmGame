@@ -4,7 +4,7 @@ import { Base, Judgement } from "./notes.js";
 
 export class Effect {
     analyser: AnalyserNode;
-    source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode;
+    source: MediaElementAudioSourceNode | undefined;
     array: Uint8Array;
     canvas: HTMLCanvasElement;
     cvsCtx: CanvasRenderingContext2D;
@@ -41,7 +41,7 @@ export class Effect {
     }
 
 
-    set fftSize(size: number) {
+    setFftSize(size: number) {
         this.analyser.fftSize = size;
     }
 
@@ -97,11 +97,11 @@ export class Effect {
 
 
     draw() {
-        this.changeStyle();
         var bar_width = this.canvas.width / (this.frequencyBinCount * 2.5);
         var width = this.canvas.width / 2;
         var height = this.canvas.height;
         
+        this.changeStyle();
         this.clear();
         
         var angle = Math.PI * 2 / this.frequencyBinCount;
@@ -153,10 +153,12 @@ export class AudioNote implements Base {
 export class AudioQueue {
     length: number;
     notes: AudioNote[];
+    srcs: AudioBufferSourceNode[];
 
     constructor() {
         this.length = 0;
         this.notes = new Array<AudioNote>();
+        this.srcs = new Array<AudioBufferSourceNode>();
     }
 
 
@@ -206,6 +208,21 @@ export class AudioQueue {
         analyser.connect(context.destination);
 
         gain.gain.setValueAtTime(mvolume, context.currentTime);
+        this.srcs.push(source);
         source.start(0);
+    }
+
+
+    clear() {
+        while (this.length != 0) {
+            this.notes.pop();
+            this.length -= 1;
+        }
+
+        while (this.srcs.length != 0) {
+            var src = this.srcs.pop();
+            src.stop();
+            src.disconnect();
+        }
     }
 }

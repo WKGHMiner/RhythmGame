@@ -1,21 +1,21 @@
 {
-  "compileOnSave": true,
-  "compilerOptions": {
-    "moduleResolution": "node",
-    "module": "ES6",
-    "target": "ES6",
-    "esModuleInterop": true,
-    "outDir": "../",
-    "lib": [ "ES2015", "DOM", "DOM.Iterable", "ES2020" ],
-    "sourceMap": false,
-    "newLine": "crlf",
-    "typeRoots": [
-      "../../node_modules/@types"
-    ]
-  },
-  "exclude": [
-    "node_modules",
-    "logs"
-  ],
-  "type":["node"]
+    "compileOnSave": true,
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "module": "ES6",
+        "target": "ES6",
+        "esModuleInterop": true,
+        "outDir": "../",
+        "lib": [ "ES2015", "DOM", "DOM.Iterable", "ES2020" ],
+        "sourceMap": false,
+        "newLine": "crlf",
+        "typeRoots": [
+            "../../node_modules/@types"
+        ]
+    },
+    "exclude": [
+        "node_modules",
+        "logs"
+    ],
+    "type":["node"]
 }

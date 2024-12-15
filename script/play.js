@@ -24,19 +24,24 @@ export class Chart {
         this.track = object["track"];
         this.tracks = [];
         this.offset = object["offset"];
+        this.object = object;
         for (var _ = 0; _ < this.track; _++) {
             this.tracks.push(new Track());
         }
         document.title = `${this.composer} - ${this.name}`;
-        this.loadChart(object, sounds);
+        this.loadChart(sounds);
     }
     loadMusic() {
         var audio = document.createElement("audio");
         audio.src = this.music_path;
         return audio;
     }
-    loadChart(object, sounds) {
-        var notes = object["notes"];
+    loadChart(sounds) {
+        if (this.object != undefined) {
+            this.tracks.forEach(track => track.clear());
+            sounds.clear();
+        }
+        var notes = this.object["notes"];
         notes.sort((a, b) => a["time"] - b["time"]);
         for (var index = 0; index < notes.length; index++) {
             var obj = notes[index];
@@ -123,5 +128,15 @@ export class Track {
             }
             source.start(0);
         });
+    }
+    clear() {
+        while (this.length != 0) {
+            var note = this.notes.pop();
+            var elem = document.getElementById(`Note${note.id}`);
+            if (elem) {
+                TRACKS[note.track].removeChild(elem);
+            }
+            this.length -= 1;
+        }
     }
 }
