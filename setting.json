@@ -7,5 +7,5 @@
     "music-volume": 0.8,
     "sound-volume": 0.5,
     "allow-visualisation": true,
-    "auto": true
+    "auto": false
 }

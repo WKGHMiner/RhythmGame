@@ -48,13 +48,52 @@ body {
     left: 0%;
     width: 4%;
     height: 8%;
+    border-bottom-right-radius: 25%;
     background-color: rgba(255, 255, 255, 0.6);
     background-image: url(../resource/pause.png);
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
+    transition: 0.25s;
     cursor: pointer;
     z-index: 5;
+}
+
+
+.MainContainer > .PauseBtn:hover {
+    transform: scale(1.05);
+}
+
+
+.MainContainer > .PauseBtn:active {
+    transform: scale(0.9);
+}
+
+
+.MainContainer .ExitBtn {
+    position: absolute;
+    top: 75%;
+    left: 50%;
+    width: 10%;
+    height: 10%;
+    background-color: rgba(255, 255, 255, 0.6);
+    border-radius: 15%;
+    font-size: xx-large;
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition: 0.25s;
+    visibility: hidden;
+    z-index: 5;
+}
+
+
+.MainContainer .ExitBtn:hover {
+    transform: translate(-50%, -50%) scale(1.05);
+}
+
+
+.MainContainer .ExitBtn:active {
+    transform: translate(-50%, -50%) scale(0.9);
 }
 
 

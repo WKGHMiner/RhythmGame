@@ -256,6 +256,8 @@ class Game {
 
         this.music.addEventListener("ended", _ => {
             isEnded = true;
+            const ExitBtn = document.querySelector(".ExitBtn") as HTMLButtonElement;
+            ExitBtn.style.visibility = "visible";
         }, {once: true});
     }
 

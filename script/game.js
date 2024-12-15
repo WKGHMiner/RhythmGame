@@ -214,6 +214,8 @@ class Game {
             yield this.loadEffect();
             this.music.addEventListener("ended", _ => {
                 isEnded = true;
+                const ExitBtn = document.querySelector(".ExitBtn");
+                ExitBtn.style.visibility = "visible";
             }, { once: true });
         });
     }
