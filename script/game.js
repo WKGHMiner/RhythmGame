@@ -1,12 +1,3 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import { Chart } from "./play.js";
 import { Judgement } from "./notes.js";
 import { Effect, AudioQueue } from "./effect.js";
@@ -42,7 +33,7 @@ export var render_duration = 500;
 export var speed = 10;
 export var duration = 40;
 export var offset = 0;
-export var mvolume = 0.4;
+export var mvolume = 0.8;
 export var svolume = 0.5;
 export var isAuto = false;
 // Global time counter.
@@ -62,30 +53,26 @@ var isVisualizeAllowed = true;
 var isPaused = false;
 var isEnded = false;
 /** Read `setting.json` to update settings. */
-export function readSetting() {
-    return __awaiter(this, void 0, void 0, function* () {
-        setting = yield (yield fetch("./setting.json")).json();
-        key_bind = setting["key-bind"];
-        render_duration = setting["render-duration"];
-        speed = setting["speed"];
-        duration = setting["duration"];
-        isAuto = setting["auto"];
-        isVisualizeAllowed = setting["allow-visualisation"];
-        mvolume = setting["music-volume"];
-        svolume = setting["sound-volume"];
-    });
+export async function readSetting() {
+    setting = await (await fetch("./setting.json")).json();
+    key_bind = setting["key-bind"];
+    render_duration = setting["render-duration"];
+    speed = setting["speed"];
+    duration = setting["duration"];
+    isAuto = setting["auto"];
+    isVisualizeAllowed = setting["allow-visualisation"];
+    mvolume = setting["music-volume"];
+    svolume = setting["sound-volume"];
 }
 /** Read `SessionStorage` to update settings. */
 function readStorage() {
     if (sessionStorage.length != 0) {
-        key_bind = sessionStorage["key-bind"];
-        render_duration = sessionStorage["render-duration"];
-        speed = sessionStorage["speed"];
-        duration = sessionStorage["duration"];
-        isAuto = sessionStorage["auto"];
-        isVisualizeAllowed = sessionStorage["allow-visualisation"];
-        mvolume = sessionStorage["music-volume"];
-        svolume = sessionStorage["sound-volume"];
+        speed = parseInt(sessionStorage["speed"]);
+        duration = parseInt(sessionStorage["difficulty"]);
+        isAuto = sessionStorage["auto"] == "true";
+        isVisualizeAllowed = sessionStorage["allow-visualisation"] == "true";
+        mvolume = parseFloat(sessionStorage["music-volume"]);
+        svolume = parseFloat(sessionStorage["sound-volume"]);
     }
     else {
         window.alert("Invalid session data!");
@@ -200,29 +187,25 @@ class Game {
     get isSpecial() {
         return this.chart.special;
     }
-    loadContext() {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.music = this.chart.loadMusic();
-            if (this.isSpecial) {
-                this.context = new window.AudioContext();
-                this.music.volume = 0;
-            }
-            else {
-                this.context = new AudioContext();
-                this.music.volume = mvolume;
-            }
-            yield this.loadEffect();
-            this.music.addEventListener("ended", _ => {
-                isEnded = true;
-                const ExitBtn = document.querySelector(".ExitBtn");
-                ExitBtn.style.visibility = "visible";
-            }, { once: true });
-        });
+    async loadContext() {
+        this.music = this.chart.loadMusic();
+        if (this.isSpecial) {
+            this.context = new window.AudioContext();
+            this.music.volume = 0;
+        }
+        else {
+            this.context = new AudioContext();
+            this.music.volume = mvolume;
+        }
+        await this.loadEffect();
+        this.music.addEventListener("ended", _ => {
+            isEnded = true;
+            const ExitBtn = document.querySelector(".ExitBtn");
+            ExitBtn.style.visibility = "visible";
+        }, { once: true });
     }
-    loadEffect() {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.effect = new Effect(this.music, this.context, this.isSpecial);
-        });
+    async loadEffect() {
+        this.effect = new Effect(this.music, this.context, this.isSpecial);
     }
     loadBg() {
         var illustration = document.querySelector(".Illustration");
@@ -327,13 +310,11 @@ class Game {
  *
  *  @param path The path of chart json file.
  */
-export function MainbyRead(path) {
-    return __awaiter(this, void 0, void 0, function* () {
-        yield readSetting();
-        var obj = yield (yield fetch(path)).json();
-        var game = new Game(obj);
-        yield MainBody(game);
-    });
+export async function MainbyRead(path) {
+    await readSetting();
+    var obj = await (await fetch(path)).json();
+    var game = new Game(obj);
+    await MainBody(game);
 }
 /** Main function
  *
@@ -341,40 +322,36 @@ export function MainbyRead(path) {
  *
  *  @param literal The text content of chart json file.
  */
-export function MainByConvert(literal) {
-    return __awaiter(this, void 0, void 0, function* () {
-        readStorage();
-        var game = new Game(literal);
-        yield MainBody(game);
-    });
+export async function MainByConvert(literal) {
+    readStorage();
+    var game = new Game(null, literal);
+    await MainBody(game);
 }
-function MainBody(game) {
-    return __awaiter(this, void 0, void 0, function* () {
-        game.loadBg();
-        yield game.loadContext();
-        if (!isAuto) {
-            document.addEventListener("keydown", (event) => {
-                if (!isPaused) {
-                    var key = event.key.toUpperCase();
-                    var ki = key_bind.indexOf(key);
-                    if (ki != -1) {
-                        score += game.hit(ki);
-                        pressOn(ki);
-                    }
+async function MainBody(game) {
+    game.loadBg();
+    await game.loadContext();
+    if (!isAuto) {
+        document.addEventListener("keydown", event => {
+            if (!isPaused) {
+                var key = event.key.toUpperCase();
+                var ki = key_bind.indexOf(key);
+                if (ki != -1) {
+                    score += game.hit(ki);
+                    pressOn(ki);
                 }
-            });
-            document.addEventListener("keyup", (event) => {
-                if (!isPaused) {
-                    var key = event.key.toUpperCase();
-                    var ki = key_bind.indexOf(key);
-                    if (ki != -1) {
-                        pressOut(ki);
-                    }
+            }
+        });
+        document.addEventListener("keyup", event => {
+            if (!isPaused) {
+                var key = event.key.toUpperCase();
+                var ki = key_bind.indexOf(key);
+                if (ki != -1) {
+                    pressOut(ki);
                 }
-            });
-        }
-        getReady(game);
-    });
+            }
+        });
+    }
+    getReady(game);
 }
 function Main() {
     var path = sessionStorage.getItem("path");
@@ -390,5 +367,5 @@ function Main() {
     window.alert("Invalid Chart Infomation.");
     exit();
 }
-MainbyRead("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape.json");
-// MainbyRead("./chart/Override/Nhato_Override_Modified.json");
+await readSetting();
+Main();

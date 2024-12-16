@@ -41,7 +41,7 @@ export var render_duration: number = 500;
 export var speed: number = 10;
 export var duration: number = 40;
 export var offset: number = 0;
-export var mvolume: number = 0.4;
+export var mvolume: number = 0.8;
 export var svolume: number = 0.5;
 export var isAuto: boolean = false;
 
@@ -84,14 +84,12 @@ export async function readSetting() {
 /** Read `SessionStorage` to update settings. */
 function readStorage() {
     if (sessionStorage.length != 0) {
-        key_bind = sessionStorage["key-bind"];
-        render_duration = sessionStorage["render-duration"];
-        speed = sessionStorage["speed"];
-        duration = sessionStorage["duration"];
-        isAuto = sessionStorage["auto"];
-        isVisualizeAllowed = sessionStorage["allow-visualisation"];
-        mvolume = sessionStorage["music-volume"];
-        svolume = sessionStorage["sound-volume"];
+        speed = parseInt(sessionStorage["speed"]);
+        duration = parseInt(sessionStorage["difficulty"]);
+        isAuto = sessionStorage["auto"] == "true";
+        isVisualizeAllowed = sessionStorage["allow-visualisation"] == "true";
+        mvolume = parseFloat(sessionStorage["music-volume"]);
+        svolume = parseFloat(sessionStorage["sound-volume"]);
     } else {
         window.alert("Invalid session data!");
     }
@@ -222,7 +220,7 @@ class Game {
     music: HTMLAudioElement;
     context: AudioContext;
 
-    constructor(obj?: Object, literal?: string) {
+    constructor(obj: Object, literal?: string) {
         if (obj) {
             this.chart = new Chart(obj, this.sounds);
         } else if (literal) {
@@ -409,7 +407,7 @@ export async function MainbyRead(path: string) {
  */
 export async function MainByConvert(literal: string) {
     readStorage();
-    var game = new Game(literal);
+    var game = new Game(null, literal);
 
     await MainBody(game);
 }
@@ -420,7 +418,7 @@ async function MainBody(game: Game) {
     await game.loadContext();
 
     if (!isAuto) {
-        document.addEventListener("keydown", (event) => {
+        document.addEventListener("keydown", event => {
             if (!isPaused) {
                 var key = event.key.toUpperCase();
                 var ki = key_bind.indexOf(key);
@@ -432,7 +430,7 @@ async function MainBody(game: Game) {
             }
         });
     
-        document.addEventListener("keyup", (event) => {
+        document.addEventListener("keyup", event => {
             if (!isPaused) {
                 var key = event.key.toUpperCase();
                 var ki = key_bind.indexOf(key);
@@ -466,5 +464,5 @@ function Main() {
 }
 
 
-// MainbyRead("./chart/Never_Escape/void Gt. HAKKYOU-KUN_Never Escape.json");
-MainbyRead("./chart/Override/Nhato_Override_Modified.json");
+await readSetting();
+Main();

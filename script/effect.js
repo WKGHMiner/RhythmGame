@@ -1,12 +1,3 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import { duration, global_time, mvolume } from "./game.js";
 import { Judgement } from "./notes.js";
 export class Effect {
@@ -140,23 +131,21 @@ export class AudioQueue {
             index -= 1;
         }
     }
-    play(context, analyser, note) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var path = note.sound;
-            console.log("Time: " + note.time + ", Remain: " + this.length);
-            console.log("AudioNote: " + path);
-            var audio = yield fetch(path);
-            var buffer = yield context.decodeAudioData(yield audio.arrayBuffer());
-            const source = context.createBufferSource();
-            source.buffer = buffer;
-            const gain = context.createGain();
-            source.connect(gain);
-            gain.connect(analyser);
-            analyser.connect(context.destination);
-            gain.gain.setValueAtTime(mvolume, context.currentTime);
-            this.srcs.push(source);
-            source.start(0);
-        });
+    async play(context, analyser, note) {
+        var path = note.sound;
+        console.log("Time: " + note.time + ", Remain: " + this.length);
+        console.log("AudioNote: " + path);
+        var audio = await fetch(path);
+        var buffer = await context.decodeAudioData(await audio.arrayBuffer());
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const gain = context.createGain();
+        source.connect(gain);
+        gain.connect(analyser);
+        analyser.connect(context.destination);
+        gain.gain.setValueAtTime(mvolume, context.currentTime);
+        this.srcs.push(source);
+        source.start(0);
     }
     clear() {
         while (this.length != 0) {

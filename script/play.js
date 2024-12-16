@@ -1,12 +1,3 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import { TRACKS, global_time, svolume, mvolume, showJudgement, updateHit } from "./game.js";
 import { AudioNote } from "./effect.js";
 import { Judgement, Note, Tap, ExTap } from "./notes.js";
@@ -106,28 +97,26 @@ export class Track {
         this.length -= 1;
         return note;
     }
-    hitSound(context, note, isSpecial, analyser) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var path = note.getSound();
-            console.log("Id: " + note.id + ", Time: ", note.time);
-            console.log("Hit sound:" + path);
-            var audio = yield fetch(path);
-            var buffer = yield context.decodeAudioData(yield audio.arrayBuffer());
-            const source = context.createBufferSource();
-            source.buffer = buffer;
-            const gain = context.createGain();
-            source.connect(gain);
-            if (isSpecial) {
-                gain.connect(analyser);
-                analyser.connect(context.destination);
-                gain.gain.setValueAtTime(mvolume, context.currentTime);
-            }
-            else {
-                gain.connect(context.destination);
-                gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
-            }
-            source.start(0);
-        });
+    async hitSound(context, note, isSpecial, analyser) {
+        var path = note.getSound();
+        console.log("Id: " + note.id + ", Time: ", note.time);
+        console.log("Hit sound:" + path);
+        var audio = await fetch(path);
+        var buffer = await context.decodeAudioData(await audio.arrayBuffer());
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const gain = context.createGain();
+        source.connect(gain);
+        if (isSpecial) {
+            gain.connect(analyser);
+            analyser.connect(context.destination);
+            gain.gain.setValueAtTime(mvolume, context.currentTime);
+        }
+        else {
+            gain.connect(context.destination);
+            gain.gain.setValueAtTime(0.5 * svolume, context.currentTime);
+        }
+        source.start(0);
     }
     clear() {
         while (this.length != 0) {
