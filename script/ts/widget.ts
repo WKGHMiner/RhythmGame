@@ -1,8 +1,6 @@
-import init, { convert_as_string } from "../../mcp/pkg/mcp.js";
 export { RawListRange, ListRange, NumberRange, FloatRange, CheckBox, FileSelector, ControlButton };
 
 
-await init();
 const Container = document.querySelector(".Container") as HTMLDivElement;
 
 

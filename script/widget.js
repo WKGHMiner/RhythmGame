@@ -1,6 +1,4 @@
-import init from "../../mcp/pkg/mcp.js";
 export { RawListRange, ListRange, NumberRange, FloatRange, CheckBox, FileSelector, ControlButton };
-await init();
 const Container = document.querySelector(".Container");
 class BaseRange {
     constructor(name) {
@@ -231,6 +229,7 @@ class FileSelector {
             return "literal";
         }
     }
+    // Yes, we are unable to use mcp, because browser does not allow directory access!😅
     async getValue() {
         var s;
         if (this.jsonFile != null) {
